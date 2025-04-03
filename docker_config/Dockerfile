@@ -26,6 +26,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-ply \
     libglib2.0-dev \
     libgstreamer-plugins-base1.0-dev \
+    # Install ROS Usb Cam package
+    ros-jazzy-usb-cam \
     # Install dependencies for WiringPi
     wget \
     # Other dependencies
