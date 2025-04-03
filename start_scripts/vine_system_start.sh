@@ -84,6 +84,7 @@ container_start() {
         $X11_ARGS \
         -e TERM=xterm-256color \
         -e VINE_CONTAINER=1 \
+        -e MOUNT_POINT="$MOUNT_POINT" \
         --hostname vine-docker \
         --add-host vine-docker:127.0.1.1 \
         "$IMAGE_NAME")
