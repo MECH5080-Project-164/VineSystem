@@ -27,7 +27,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-dev \
     libgstreamer-plugins-base1.0-dev \
     # Install dependencies for WiringPi
-    wget
+    wget \
+    # Other dependencies
+    v4l-utils
 
 # Clone and build Raspberry Pi's Libcamera fork
 RUN git clone --depth 1 https://github.com/raspberrypi/libcamera.git \
