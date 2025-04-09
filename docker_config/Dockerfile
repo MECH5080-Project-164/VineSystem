@@ -51,10 +51,11 @@ RUN git clone --depth 1 https://github.com/raspberrypi/libcamera.git \
     && cd .. \
     && rm -rf libcamera/.git
 
-# Clone and build camera_ros
-RUN mkdir -p /picam/src \
+# Clone and build our fork of the camera_ros package
+ADD "https://api.github.com/repos/MECH5080-Project-164/camera_ros/commits?per_page=1" latest_commit
+RUN apt-get update && mkdir -p /picam/src \
     && cd /picam/src \
-    && git clone https://github.com/christianrauch/camera_ros.git \
+    && git clone https://github.com/MECH5080-Project-164/camera_ros.git \
     && source /opt/ros/$ROS_DISTRO/setup.bash \
     && cd /picam \
     && rosdep install -y --from-paths src --ignore-src --rosdistro $ROS_DISTRO --skip-keys=libcamera \
