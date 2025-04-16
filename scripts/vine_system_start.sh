@@ -80,7 +80,6 @@ container_start() {
         -v "${BIND_DIR}:${MOUNT_POINT}:rw" \
         -v /dev:/dev \
         -v /run/udev/:/run/udev/ \
-        -v /dev:/dev \
         $X11_ARGS \
         -e TERM=xterm-256color \
         -e VINE_CONTAINER=1 \
