@@ -21,6 +21,8 @@ ament_target_dependencies(led_control_chassis_node
   vine_interfaces
 )
 
+target_link_libraries(led_control_chassis_node ${catkin_LIBRARIES} -lwiringPi)
+
 target_include_directories(led_control_chassis_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
