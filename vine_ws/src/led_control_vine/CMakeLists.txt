@@ -12,12 +12,21 @@ find_package(ament_cmake REQUIRED)
 # find_package(<dependency> REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(vine_interfaces REQUIRED)
 
 add_executable(led_control_vine_node src/led_control_vine_node.cpp)
-ament_target_dependencies(led_control_vine_node rclcpp std_msgs)
+ament_target_dependencies(led_control_vine_node
+  rclcpp
+  std_msgs
+  vine_interfaces
+)
+
+target_link_libraries(led_control_vine_node ${catkin_LIBRARIES} -lwiringPi)
+
 target_include_directories(led_control_vine_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
+
 target_compile_features(led_control_vine_node PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
 install(TARGETS led_control_vine_node

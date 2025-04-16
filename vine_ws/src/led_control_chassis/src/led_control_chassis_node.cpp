@@ -28,7 +28,7 @@ public:
     RCLCPP_INFO(this->get_logger(), "LedControlChassis node has been started.");
     RCLCPP_INFO(this->get_logger(), "Waiting for messages on 'chassis_led_control' topic...");
 
-    // Initialize wiringPi
+    // Initialise wiringPi
     if (wiringPiSetupPinType(WPI_PIN_BCM) == -1) {
       RCLCPP_ERROR(this->get_logger(), "Failed to initialize wiringPi");
       return;
