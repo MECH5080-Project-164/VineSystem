@@ -23,7 +23,7 @@ public:
     // Declare the node parameters
     auto pwm_pins_desc = rcl_interfaces::msg::ParameterDescriptor();
     pwm_pins_desc.description = "List of GPIO pins (BCM) for PWM output";
-    this->declare_parameter<std::vector<int64_t>>("pwm_pins", {12}, pwm_pins_desc);
+    this->declare_parameter<std::vector<int64_t>>("pwm_pins", {13}, pwm_pins_desc);
     this->declare_parameter<int64_t>("pwm_range", 499); // For 50kHz PWM frequency
     this->declare_parameter<int64_t>("pwm_clock", 1); // For 50kHz PWM frequency
 
