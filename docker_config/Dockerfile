@@ -1,6 +1,8 @@
 FROM arm64v8/ros:jazzy
 LABEL description="Extends base OSRF ROS Official ARM64v8 image to support raspberry pi camera module 3 and GPIO operation"
 
+ENV DEBIAN_FRONTEND=noninteractive
+
 SHELL ["/bin/bash", "-c"]
 WORKDIR /picam
 
@@ -34,8 +36,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     v4l-utils
 
 # Clone and build Raspberry Pi's Libcamera fork
-RUN git clone --depth 1 https://github.com/raspberrypi/libcamera.git \
+ARG LIBCAMERA_COMMIT_HASH="d83ff0a4ae4503bc56b7ed48cd142c3dd423ad3b"
+RUN git clone https://github.com/raspberrypi/libcamera.git \
     && cd libcamera \
+    && git checkout "${LIBCAMERA_COMMIT_HASH}" \
     && meson setup build --buildtype=release \
       -Dpipelines=rpi/vc4,rpi/pisp \
       -Dipas=rpi/vc4,rpi/pisp \
@@ -62,7 +66,7 @@ RUN apt-get update && mkdir -p /picam/src \
     && colcon build --event-handlers=console_direct+
 
 # Configure the entry point
-COPY docker_entrypoint.sh /picam/
+COPY ./docker_config/docker_entrypoint.sh /picam/
 ENTRYPOINT ["/picam/docker_entrypoint.sh"]
 
 WORKDIR /wiringpi
