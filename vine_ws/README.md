@@ -28,6 +28,8 @@ And, from the root of this workspace:
 source install/setup.bash
 ```
 
+Note that whenever anything related to the ROS applications in the vine_ws is used in a terminal, then the ROS environment must be sourced. For example, when starting a ROS node or publishing to a topic, the environment must be set up first.
+
 ### Running Nodes
 
 In one terminal, run:
