@@ -66,7 +66,7 @@ RUN apt-get update && mkdir -p /picam/src \
     && colcon build --event-handlers=console_direct+
 
 # Configure the entry point
-COPY ./docker_config/docker_entrypoint.sh /picam/
+COPY ./docker_entrypoint.sh /picam/
 ENTRYPOINT ["/picam/docker_entrypoint.sh"]
 
 WORKDIR /wiringpi
