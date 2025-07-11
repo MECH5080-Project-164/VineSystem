@@ -1,0 +1,14 @@
+%YAML 1.2
+---
+launch:
+  - node:
+      pkg: "led_control_chassis"
+      exec: "led_control_chassis_node"
+      name: "chassis_leds"
+      namespace: "vine_control"
+
+  - node:
+      pkg: "led_control_vine"
+      exec: "led_control_vine_node"
+      name: "vine_leds"
+      namespace: "vine_control"
