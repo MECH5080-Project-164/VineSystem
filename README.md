@@ -8,9 +8,11 @@
 - [find_endoscope](scripts/find_endoscope): This script finds the endoscope camera and gives it's mount point. The script can also be used to modify a yaml parameter file to set the camera mount point.
 - [start_pi_camera](scripts/start_pi_camera): This script starts the Pi Camera. It uses the `camera_ros` package and defers in all configuration to that. The script does accept an argument for the index of the camera to start (optional). This is used when there are multiple cameras connected through CSI.
 
+[vine_ws](vine_ws) contains the ROS workspace for the Vine Robot software. Further details on how to use this workspace can be found in the [`vine_ws/README.md`](vine_ws/README.md) file.
+
 ## Raspbian
 
-Mostly, we use Raspbian as it is out of the box. We have only made a change to the `/boot/firmware/config.txt` file to enable the camera. The file was modified as such:
+Mostly, we use Raspbian as it is out of the box. We have only made a change to the `/boot/firmware/config.txt` file to enable the camera and another to enable the external PCIe port. The file was modified as such:
 
 ```bash
 - camera_auto_detect=1
@@ -19,9 +21,31 @@ Mostly, we use Raspbian as it is out of the box. We have only made a change to t
 [All]
 + dtoverlay=imx708,cam0
 + dtoverlay=imx708,cam1
++
++ # Enable external PCIe port on Pi5
++ dtparam=pciex1
 ```
 
-This change in necassary to work with the ArduCams. Note that for an official Pi Camera Module 3, we didn't need to make this change. The camera was detected automatically and worked out of the box.
+This change in necessity to work with the ArduCams. Note that for an official Pi Camera Module 3, we didn't need to make this change. The camera was detected automatically and worked out of the box.
+
+We also modify the boot order in the bootloader to ensure that we try to boot from an NVMe SSD in the PCIe interface before trying to boot from the SD card. This is done by modifying the `boot_order` parameter in the bootloader configuration.
+
+```bash
+## From https://www.jeffgeerling.com/blog/2023/nvme-ssd-boot-raspberry-pi-5
+# Edit the EEPROM on the Raspberry Pi 5.
+sudo rpi-eeprom-config --edit
+
+# Change the BOOT_ORDER line to the following:
+BOOT_ORDER=0xf416
+
+# Add the following line if using a non-HAT+ adapter:
+PCIE_PROBE=1
+
+# Press Ctrl-O, then enter, to write the change to the file.
+# Press Ctrl-X to exit nano (the editor).
+```
+
+Once these changes are made, it is recommended to reboot the Raspberry Pi to ensure that the changes take effect.
 
 ## Docker
 
