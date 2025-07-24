@@ -6,39 +6,43 @@ ENV DEBIAN_FRONTEND=noninteractive
 SHELL ["/bin/bash", "-c"]
 WORKDIR /picam
 
+# Install stable system packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Install ros2 desktop packages
-    ros-jazzy-desktop=0.11.0-1* \
+    git \
+    wget \
+    cmake \
+    meson \
+    openssl \
+    i2c-tools \
+    v4l-utils
+
+# Install development libraries
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libboost-dev \
+    libgnutls28-dev \
+    libtiff-dev \
+    pybind11-dev \
+    libglib2.0-dev \
+    libgstreamer-plugins-base1.0-dev \
     qtbase5-dev \
     libqt5core5a \
     libqt5gui5 \
-    libqt5widgets5 \
-    # Install Dependencies for libcamera
-    git \
+    libqt5widgets5
+
+# Install Python packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     python3-jinja2 \
-    libboost-dev \
-    libgnutls28-dev \
-    openssl \
-    libtiff-dev \
-    pybind11-dev \
-    meson \
-    cmake \
     python3-yaml \
     python3-ply \
-    libglib2.0-dev \
-    libgstreamer-plugins-base1.0-dev \
-    # Install ROS Usb Cam package
-    ros-jazzy-usb-cam \
-    # Install dependencies for WiringPi
-    wget \
-    # Install I2C and GPIO dependencies for pressure sensor
     python3-smbus \
     python3-spidev \
-    python3-rpi.gpio \
-    i2c-tools \
-    # Other dependencies
-    v4l-utils
+    python3-rpi.gpio
+
+# Install ROS packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-jazzy-desktop=0.11.0-1* \
+    ros-jazzy-usb-cam
 
 # Clone and build Raspberry Pi's Libcamera fork
 ARG LIBCAMERA_COMMIT_HASH="d83ff0a4ae4503bc56b7ed48cd142c3dd423ad3b"
