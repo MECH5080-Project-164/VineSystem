@@ -8,10 +8,10 @@ class PressureSensorNode(Node):
         super().__init__('pressure_sensor_node')
 
         # Parameters for the pressure sensor
-        self.declare_parameter('i2c_bus', rclpy.Parameter.Type.INTEGER, '1')
-        self.declare_parameter('i2c_address', rclpy.Parameter.Type.INTEGER, 0x16)
-        self.declare_parameter('publish_rate_hz', rclpy.Parameter.Type.DOUBLE, 1.0)
-        self.declare_parameter('mean_sample_size', rclpy.Parameter.Type.INTEGER, 10)
+        self.declare_parameter('i2c_bus', 1)
+        self.declare_parameter('i2c_address', 0x16)
+        self.declare_parameter('publish_rate_hz', 1.0)
+        self.declare_parameter('mean_sample_size', 10)
 
         # Get parameters
         i2c_bus = self.get_parameter('i2c_bus').get_parameter_value().value
