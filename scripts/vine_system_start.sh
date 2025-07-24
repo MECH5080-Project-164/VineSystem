@@ -14,6 +14,7 @@ show_help() {
     echo "Options:"
     echo "  -h, --help        Show this help message"
     echo "  -n, --name NAME   Set the container name (default: $CONTAINER_NAME)"
+    echo "  -i, --image NAME  Set the Docker image name (default: $IMAGE_NAME)"
     echo "  -c, --clean       Remove existing container before starting a new one"
     echo
 }
@@ -134,6 +135,15 @@ while [[ $# -gt 0 ]]; do
             fi
 
             CONTAINER_NAME="$2"
+            shift 2
+            ;;
+        -i|--image)
+            if [[ -z "$2" || "$2" == -* ]]; then
+                echo "Error: --image requires a non-empty argument."
+                show_help
+                exit 1
+            fi
+            IMAGE_NAME="$2"
             shift 2
             ;;
         -c|--clean)
