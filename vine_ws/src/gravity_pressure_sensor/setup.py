@@ -13,9 +13,8 @@ setup(
     ],
     install_requires=[
         'setuptools',
-        'smbus',
-        'spidev',
-        'RPi.GPIO'
+        # Hardware-specific packages are installed at system level in Docker
+        # 'smbus', 'spidev', 'RPi.GPIO' - installed via apt in Dockerfile
     ],
     zip_safe=True,
     maintainer='root',

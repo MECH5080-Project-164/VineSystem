@@ -32,6 +32,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-jazzy-usb-cam \
     # Install dependencies for WiringPi
     wget \
+    # Install I2C and GPIO dependencies for pressure sensor
+    python3-smbus \
+    python3-spidev \
+    python3-rpi.gpio \
+    i2c-tools \
     # Other dependencies
     v4l-utils
 
