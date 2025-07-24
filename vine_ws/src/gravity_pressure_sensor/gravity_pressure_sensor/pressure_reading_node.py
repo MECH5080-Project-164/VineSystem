@@ -6,13 +6,30 @@ from .DFRobot_MPX5700 import DFRobot_MPX5700_I2C
 class PressureSensorNode(Node):
     def __init__(self):
         super().__init__('pressure_sensor_node')
+
+        # Parameters for the pressure sensor
+        self.declare_parameters('i2c_bus', 1)
+        self.declare_parameters('i2c_address', 0x16)
+        self.declare_parameters('publish_rate_hz', 1.0)
+        self.declare_parameters('mean_sample_size', 10)
+
+        # Get parameters
+        i2c_bus = self.get_parameter('i2c_bus').get_parameter_value().value
+        i2c_address = self.get_parameter('i2c_address').get_parameter_value().value
+        self.publish_rate_hz = self.get_parameter('publish_rate_hz').get_parameter_value().value
+        self.mean_sample_size = self.get_parameter('mean_sample_size').get_parameter_value().value
+
         self.get_logger().info('Pressure sensor node started')
+        self.get_logger().info(
+            f'Using I2C bus {i2c_bus} at address 0x{i2c_address:02X} '
+            f'with {self.publish_rate_hz}Hz publish rate.'
+        )
 
         # Initialise the pressure sensor
         # I2C bus 1, sensor address 0x16
         try:
-            self.pressure_sensor = DFRobot_MPX5700_I2C(1, 0x16)
-            self.pressure_sensor.set_mean_sample_size(10)
+            self.pressure_sensor = DFRobot_MPX5700_I2C(i2c_bus, i2c_address)
+            self.pressure_sensor.set_mean_sample_size(self.mean_sample_size)
             self.get_logger().info('Pressure sensor initialized successfully')
         except Exception as e:
             self.get_logger().error(f'Failed to initialize pressure sensor: {str(e)}')
@@ -22,7 +39,7 @@ class PressureSensorNode(Node):
         self.pressure_publisher = self.create_publisher(Float32, 'pressure', 10)
 
         # Timer to publish pressure readings at a fixed rate
-        timer_period = 1.0  # seconds
+        timer_period = 1.0 / self.publish_rate_hz  # seconds
         self.timer = self.create_timer(timer_period, self.publish_pressure)
 
     def publish_pressure(self):
@@ -47,9 +64,13 @@ class PressureSensorNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     pressure_node = PressureSensorNode()
-    rclpy.spin(pressure_node)
-    pressure_node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(pressure_node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        pressure_node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
