@@ -76,6 +76,7 @@ container_start() {
     CONTAINER_ID=$($DOCKER_CMD run \
         -dit \
         --name "$CONTAINER_NAME" \
+        --user "$(id -u):$(id -g)" \
         --privileged \
         --net=host \
         -v "${BIND_DIR}:${MOUNT_POINT}:rw" \
