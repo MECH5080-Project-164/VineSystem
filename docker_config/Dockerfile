@@ -12,9 +12,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     cmake \
     meson \
+    doxygen \
     openssl \
     i2c-tools \
-    v4l-utils
+    v4l-utils \
+    build-essential
 
 # Install development libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -27,10 +29,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     qtbase5-dev \
     libqt5core5a \
     libqt5gui5 \
-    libqt5widgets5
+    libqt5widgets5 \
+    gcc-arm-none-eabi \
+    libnewlib-arm-none-eabi
 
 # Install Python packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
     python3-pip \
     python3-jinja2 \
     python3-yaml \
@@ -46,6 +51,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Clone and build Raspberry Pi's Libcamera fork
 ARG LIBCAMERA_COMMIT_HASH="d83ff0a4ae4503bc56b7ed48cd142c3dd423ad3b"
+WORKDIR /tmp
 RUN git clone https://github.com/raspberrypi/libcamera.git \
     && cd libcamera \
     && git checkout "${LIBCAMERA_COMMIT_HASH}" \
@@ -62,7 +68,7 @@ RUN git clone https://github.com/raspberrypi/libcamera.git \
       -Dpycamera=enabled \
     && ninja -C build install \
     && cd .. \
-    && rm -rf libcamera/.git
+    && rm -rf /tmp/libcamera/
 
 # Clone and build our fork of the camera_ros package
 ADD "https://api.github.com/repos/MECH5080-Project-164/camera_ros/commits?per_page=1" latest_commit
@@ -74,20 +80,49 @@ RUN apt-get update && mkdir -p /picam/src \
     && rosdep install -y --from-paths src --ignore-src --rosdistro $ROS_DISTRO --skip-keys=libcamera \
     && colcon build --event-handlers=console_direct+
 
-# Configure the entry point
-COPY ./docker_entrypoint.sh /picam/
-ENTRYPOINT ["/picam/docker_entrypoint.sh"]
+# Install and build micro-ROS
+RUN source /opt/ros/$ROS_DISTRO/setup.bash \
+    && mkdir -p /microros_ws/src \
+    && cd /microros_ws \
+    && git clone -b $ROS_DISTRO https://github.com/micro-ROS/micro_ros_setup.git src/micro_ros_setup \
+    && apt-get update \
+    && rosdep update \
+    && rosdep install --from-paths src --ignore-src -y \
+    && colcon build \
+    && source install/setup.bash \
+    && ros2 run micro_ros_setup create_agent_ws.sh \
+    && ros2 run micro_ros_setup build_agent.sh
 
-WORKDIR /wiringpi
+# Install and build Pi Pico SDK and micro-ROS for Raspberry Pi Pico
+ENV PICO_TOOLCHAIN_PATH ...
+ENV PICO_SDK_PATH /pico_ws/src/pico-sdk
+RUN mkdir -p /pico_ws/src \
+    && cd /pico_ws/src \
+    && git clone --recurse-submodules https://github.com/raspberrypi/pico-sdk.git \
+    && git clone --single-branch --branch jazzy https://github.com/MECH5080-Project-164/micro_ros_raspberrypi_pico.git \
+    && echo "export PICO_TOOLCHAIN_PATH=..." >> ~/.bashrc \
+    && echo "export PICO_SDK_PATH=/pico_ws/src/pico-sdk" >> ~/.bashrc \
+    && cd micro_ros_raspberrypi_pico \
+    && mkdir build \
+    && cd build \
+    && cmake .. \
+    && make
 
 # Install precompiled WiringPi
+WORKDIR /wiringpi
 RUN wget -q https://github.com/WiringPi/WiringPi/releases/download/3.14/wiringpi_3.14_arm64.deb \
     && dpkg -i wiringpi_3.14_arm64.deb \
     && rm wiringpi_3.14_arm64.deb \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-USER root
-WORKDIR /home/workspace
+# Configure the entry point
+COPY ./docker_entrypoint.sh /
+COPY ./ros_env_setup.sh /
+RUN chmod +x /docker_entrypoint.sh /ros_env_setup.sh \
+    && echo "source /ros_env_setup.sh" >> /root/.bashrc
 
-CMD ["bash", "-i", "-c", "source /opt/ros/$ROS_DISTRO/setup.bash && bash"]
+ENTRYPOINT ["/docker_entrypoint.sh"]
+
+WORKDIR /home/workspace
+CMD ["bash"]
