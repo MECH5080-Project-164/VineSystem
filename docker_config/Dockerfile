@@ -31,7 +31,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libqt5gui5 \
     libqt5widgets5 \
     gcc-arm-none-eabi \
-    libnewlib-arm-none-eabi
+    libnewlib-arm-none-eabi \
+    libstdc++-arm-none-eabi-newlib
 
 # Install Python packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
