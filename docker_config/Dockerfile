@@ -53,9 +53,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Clone and build Raspberry Pi's Libcamera fork
 ARG LIBCAMERA_COMMIT_HASH="d83ff0a4ae4503bc56b7ed48cd142c3dd423ad3b"
 WORKDIR /tmp
-RUN git clone https://github.com/raspberrypi/libcamera.git \
-    && cd libcamera \
-    && git checkout "${LIBCAMERA_COMMIT_HASH}" \
+ADD https://github.com/raspberrypi/libcamera.git#"${LIBCAMERA_COMMIT_HASH}" /tmp/libcamera
+RUN cd libcamera \
     && meson setup build --buildtype=release \
       -Dpipelines=rpi/vc4,rpi/pisp \
       -Dipas=rpi/vc4,rpi/pisp \
@@ -97,10 +96,10 @@ RUN source /opt/ros/$ROS_DISTRO/setup.bash \
 # Install and build Pi Pico SDK and micro-ROS for Raspberry Pi Pico
 ENV PICO_TOOLCHAIN_PATH ...
 ENV PICO_SDK_PATH /pico_ws/src/pico-sdk
-RUN mkdir -p /pico_ws/src \
-    && cd /pico_ws/src \
+
+ADD https://github.com/MECH5080-Project-164/micro_ros_raspberrypi_pico.git#jazzy /pico_ws/src/micro_ros_raspberrypi_pico
+RUN cd /pico_ws/src \
     && git clone --recurse-submodules https://github.com/raspberrypi/pico-sdk.git \
-    && git clone --single-branch --branch jazzy https://github.com/MECH5080-Project-164/micro_ros_raspberrypi_pico.git \
     && echo "export PICO_TOOLCHAIN_PATH=..." >> ~/.bashrc \
     && echo "export PICO_SDK_PATH=/pico_ws/src/pico-sdk" >> ~/.bashrc \
     && cd micro_ros_raspberrypi_pico \
