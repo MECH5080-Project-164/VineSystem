@@ -93,8 +93,8 @@ RUN source /opt/ros/$ROS_DISTRO/setup.bash \
     && ros2 run micro_ros_setup build_agent.sh
 
 # Install and build Pi Pico SDK and micro-ROS for Raspberry Pi Pico
-ENV PICO_TOOLCHAIN_PATH ...
-ENV PICO_SDK_PATH /pico_ws/src/pico-sdk
+ENV PICO_TOOLCHAIN_PATH=...
+ENV PICO_SDK_PATH=/pico_ws/src/pico-sdk
 
 ADD https://github.com/MECH5080-Project-164/micro_ros_raspberrypi_pico.git#jazzy /pico_ws/src/micro_ros_raspberrypi_pico
 ADD https://api.github.com/repos/raspberrypi/pico-sdk/commits?per_page=1 latest_commit_pico_sdk
