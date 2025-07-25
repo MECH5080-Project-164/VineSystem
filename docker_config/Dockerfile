@@ -82,7 +82,7 @@ RUN apt-get update && mkdir -p /picam/src \
 
 # Install and build micro-ROS
 WORKDIR /microros_ws
-ADD https://github.com/micro-ROS/micro_ros_setup.git#"${ROS_DISTRO}" /microros_ws/src/micro_ros_setup
+ADD https://github.com/micro-ROS/micro_ros_setup.git#"${ROS_DISTRO}"" /microros_ws/src/micro_ros_setup
 RUN source /opt/ros/$ROS_DISTRO/setup.bash \
     && apt-get update \
     && rosdep update \
@@ -97,10 +97,9 @@ ENV PICO_TOOLCHAIN_PATH ...
 ENV PICO_SDK_PATH /pico_ws/src/pico-sdk
 
 ADD https://github.com/MECH5080-Project-164/micro_ros_raspberrypi_pico.git#jazzy /pico_ws/src/micro_ros_raspberrypi_pico
-ADD https://github.com/raspberrypi/pico-sdk.git /pico_ws/src/pico-sdk
-RUN cd /pico_ws/src/pico-sdk \
-    && git submodule update --init --recursive \
-    && cd /pico_ws/src \
+ADD https://api.github.com/repos/raspberrypi/pico-sdk/commits?per_page=1 latest_commit_pico_sdk
+RUN cd /pico_ws/src \
+    && git clone --recurse-submodules https://github.com/raspberrypi/pico-sdk.git \
     && echo "export PICO_TOOLCHAIN_PATH=..." >> ~/.bashrc \
     && echo "export PICO_SDK_PATH=/pico_ws/src/pico-sdk" >> ~/.bashrc \
     && cd micro_ros_raspberrypi_pico \
