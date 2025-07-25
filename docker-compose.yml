@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   vine_system:
     image: ${IMAGE_NAME:-vine_system:latest}
