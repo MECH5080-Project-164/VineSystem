@@ -82,7 +82,7 @@ RUN apt-get update && mkdir -p /picam/src \
 
 # Install and build micro-ROS
 WORKDIR /microros_ws
-ADD https://github.com/micro-ROS/micro_ros_setup.git#"${ROS_DISTRO}"" /microros_ws/src/micro_ros_setup
+ADD https://github.com/micro-ROS/micro_ros_setup.git#"${ROS_DISTRO}" /microros_ws/src/micro_ros_setup
 RUN source /opt/ros/$ROS_DISTRO/setup.bash \
     && apt-get update \
     && rosdep update \
