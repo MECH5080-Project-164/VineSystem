@@ -99,7 +99,7 @@ ENV PICO_SDK_PATH /pico_ws/src/pico-sdk
 ADD https://github.com/MECH5080-Project-164/micro_ros_raspberrypi_pico.git#jazzy /pico_ws/src/micro_ros_raspberrypi_pico
 ADD https://github.com/raspberrypi/pico-sdk.git /pico_ws/src/pico-sdk
 RUN cd /pico_ws/src \
-    && git submodules update --init --recursive \
+    && git submodule update --init --recursive \
     && echo "export PICO_TOOLCHAIN_PATH=..." >> ~/.bashrc \
     && echo "export PICO_SDK_PATH=/pico_ws/src/pico-sdk" >> ~/.bashrc \
     && cd micro_ros_raspberrypi_pico \
