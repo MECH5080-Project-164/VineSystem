@@ -49,7 +49,7 @@ class DFRobot_MPX5700(object):
     self.write_reg(0x09,sbuf)
     time.sleep(0.02)  # Reduced from 1s to 20ms
     buf = self.read_reg(0x06,2)
-    time.sleep(0.01)  # Reduced from 1s to 10ms
+    time.sleep(0.02)  # Reduced from 1s to 20ms
     try:
       Pressure_100 = (buf[0] << 8) | buf[1]
     except Exception as e:

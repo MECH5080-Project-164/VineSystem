@@ -21,11 +21,15 @@ public:
 
     auto kp_desc = rcl_interfaces::msg::ParameterDescriptor();
     kp_desc.description = "Proportional gain for PI controller";
-    this->declare_parameter<double>("kp", 1.0, kp_desc);
+    this->declare_parameter<double>("kp", 0.5, kp_desc);
 
     auto ki_desc = rcl_interfaces::msg::ParameterDescriptor();
     ki_desc.description = "Integral gain for PI controller";
     this->declare_parameter<double>("ki", 0.1, ki_desc);
+
+    auto max_integral_desc = rcl_interfaces::msg::ParameterDescriptor();
+    max_integral_desc.description = "Maximum integral error accumulation (prevents windup)";
+    this->declare_parameter<double>("max_integral", 25.0, max_integral_desc);
 
     auto control_freq_desc = rcl_interfaces::msg::ParameterDescriptor();
     control_freq_desc.description = "Control loop frequency in Hz";
@@ -44,6 +48,7 @@ public:
     target_pressure_ = this->get_parameter("pressure_target").as_double();
     kp_ = this->get_parameter("kp").as_double();
     ki_ = this->get_parameter("ki").as_double();
+    max_integral_ = this->get_parameter("max_integral").as_double();
     max_pwm_ = this->get_parameter("max_pwm").as_int();
     min_pwm_ = this->get_parameter("min_pwm").as_int();
 
@@ -72,6 +77,7 @@ public:
     RCLCPP_INFO(this->get_logger(), "Target pressure: %.2f kPa", target_pressure_);
     RCLCPP_INFO(this->get_logger(), "Proportional gain (Kp): %.3f", kp_);
     RCLCPP_INFO(this->get_logger(), "Integral gain (Ki): %.3f", ki_);
+    RCLCPP_INFO(this->get_logger(), "Max integral error: %.2f", max_integral_);
     RCLCPP_INFO(this->get_logger(), "PWM range: %d - %d", min_pwm_, max_pwm_);
     RCLCPP_INFO(this->get_logger(), "Control frequency: %.2f Hz", control_freq);
     RCLCPP_INFO(this->get_logger(), "Subscribed to: pressure");
@@ -117,6 +123,10 @@ private:
 
     // Calculate integral control output (accumulate error over time)
     integral_error_ += error * dt;
+
+    // Apply integral windup protection
+    integral_error_ = std::max(-max_integral_, std::min(max_integral_, integral_error_));
+
     double integral = ki_ * integral_error_;
 
     // Total PI control output
@@ -128,8 +138,8 @@ private:
       target_pressure_, current_pressure_, error);
 
     RCLCPP_INFO(this->get_logger(),
-      "PI Control: P=%.2f, I=%.2f, Total=%.2f",
-      proportional, integral, control_output);
+      "PI Control: P=%.2f, I=%.2f (err=%.2f), Total=%.2f",
+      proportional, integral, integral_error_, control_output);
 
     // Convert to PWM value (0-100) and apply limits
     int pwm_value = static_cast<int>(std::round(control_output));
@@ -184,6 +194,12 @@ private:
         integral_error_ = 0.0; // Reset integral when Ki changes
         RCLCPP_INFO(this->get_logger(), "Updated Ki to: %.3f", ki_);
       }
+      else if (param.get_name() == "max_integral") {
+        max_integral_ = param.as_double();
+        // Clamp current integral error to new limit
+        integral_error_ = std::max(-max_integral_, std::min(max_integral_, integral_error_));
+        RCLCPP_INFO(this->get_logger(), "Updated max integral to: %.2f", max_integral_);
+      }
       else if (param.get_name() == "max_pwm") {
         max_pwm_ = param.as_int();
         if (max_pwm_ < 0 || max_pwm_ > 100) {
@@ -231,6 +247,7 @@ private:
   double current_pressure_;
   double target_pressure_;
   double kp_, ki_;
+  double max_integral_;
   int max_pwm_, min_pwm_;
 
   // Control state variables
