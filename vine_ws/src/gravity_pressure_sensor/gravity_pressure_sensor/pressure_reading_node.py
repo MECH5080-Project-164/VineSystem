@@ -1,6 +1,8 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32
+import signal
+import sys
 from .DFRobot_MPX5700 import DFRobot_MPX5700_I2C
 
 class PressureSensorNode(Node):
@@ -21,8 +23,8 @@ class PressureSensorNode(Node):
 
         i2c_bus = 1
         i2c_address = 0x16
-        self.publish_rate_hz = 50  # Increased from 10 to 50 Hz for faster readings
-        self.mean_sample_size = 1  # Reduced from 2 to 1 for minimal averaging delay
+        self.publish_rate_hz = 50
+        self.mean_sample_size = 3
 
 
         self.get_logger().info('Pressure sensor node started')
@@ -52,7 +54,36 @@ class PressureSensorNode(Node):
         self.log_counter = 0
         self.log_every_n = 10  # Log every 10th reading (at 50Hz = 5Hz log rate)
 
+        # Shutdown flag for graceful exit
+        self.shutdown_requested = False
+
+    def destroy_node(self):
+        """Graceful shutdown of the pressure sensor node"""
+        self.get_logger().info('Shutting down pressure sensor node...')
+        self.shutdown_requested = True
+
+        # Stop the timer
+        if hasattr(self, 'timer'):
+            self.timer.cancel()
+            self.get_logger().info('Timer stopped')
+
+        # Clean up sensor resources
+        if hasattr(self, 'pressure_sensor') and self.pressure_sensor is not None:
+            try:
+                # If the sensor has a cleanup method, call it
+                # self.pressure_sensor.cleanup()  # Uncomment if available
+                self.get_logger().info('Pressure sensor resources cleaned up')
+            except Exception as e:
+                self.get_logger().warn(f'Error during sensor cleanup: {str(e)}')
+
+        self.get_logger().info('Pressure sensor node shutdown complete')
+        super().destroy_node()
+
     def publish_pressure(self):
+        # Check if shutdown was requested
+        if self.shutdown_requested:
+            return
+
         msg = Float32()
 
         if self.pressure_sensor is not None:
@@ -77,16 +108,45 @@ class PressureSensorNode(Node):
         self.pressure_publisher.publish(msg)
 
 
+def signal_handler(signum, frame):
+    """Handle SIGINT (Ctrl+C) gracefully"""
+    print('\nReceived shutdown signal (Ctrl+C)')
+    print('Initiating graceful shutdown...')
+    # The main loop will handle the actual shutdown
+
+
 def main(args=None):
+    # Set up signal handler for graceful shutdown
+    signal.signal(signal.SIGINT, signal_handler)
+
     rclpy.init(args=args)
     pressure_node = PressureSensorNode()
+
+    pressure_node.get_logger().info('Pressure sensor node started - Press Ctrl+C to shutdown gracefully')
+
     try:
         rclpy.spin(pressure_node)
     except KeyboardInterrupt:
-        pass
+        # This catches the KeyboardInterrupt after signal handler
+        pressure_node.get_logger().info('Processing shutdown request...')
+    except Exception as e:
+        pressure_node.get_logger().error(f'Unexpected error: {str(e)}')
     finally:
-        pressure_node.destroy_node()
-        rclpy.shutdown()
+        # Ensure graceful cleanup
+        pressure_node.get_logger().info('Cleaning up resources...')
+
+        try:
+            pressure_node.destroy_node()
+        except Exception as e:
+            print(f'Error during node cleanup: {str(e)}')
+
+        try:
+            rclpy.shutdown()
+            pressure_node.get_logger().info('Goodbye!')
+        except Exception as e:
+            print(f'Error during ROS shutdown: {str(e)}')
+
+        print('Pressure sensor node shutdown complete')
 
 if __name__ == '__main__':
     main()
