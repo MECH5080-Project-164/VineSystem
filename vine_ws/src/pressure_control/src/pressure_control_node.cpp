@@ -20,8 +20,12 @@ public:
     this->declare_parameter<double>("pressure_target", 0.0, pressure_target_desc);
 
     auto kp_desc = rcl_interfaces::msg::ParameterDescriptor();
-    kp_desc.description = "Proportional gain for P controller";
+    kp_desc.description = "Proportional gain for PI controller";
     this->declare_parameter<double>("kp", 1.0, kp_desc);
+
+    auto ki_desc = rcl_interfaces::msg::ParameterDescriptor();
+    ki_desc.description = "Integral gain for PI controller";
+    this->declare_parameter<double>("ki", 0.1, ki_desc);
 
     auto control_freq_desc = rcl_interfaces::msg::ParameterDescriptor();
     control_freq_desc.description = "Control loop frequency in Hz";
@@ -39,10 +43,12 @@ public:
     current_pressure_ = 0.0;
     target_pressure_ = this->get_parameter("pressure_target").as_double();
     kp_ = this->get_parameter("kp").as_double();
+    ki_ = this->get_parameter("ki").as_double();
     max_pwm_ = this->get_parameter("max_pwm").as_int();
     min_pwm_ = this->get_parameter("min_pwm").as_int();
 
     pressure_received_ = false;
+    integral_error_ = 0.0;
     last_time_ = this->now();
 
     // Create subscriber for pressure readings
@@ -65,6 +71,7 @@ public:
     RCLCPP_INFO(this->get_logger(), "=== Pressure Control Node Initialized ===");
     RCLCPP_INFO(this->get_logger(), "Target pressure: %.2f kPa", target_pressure_);
     RCLCPP_INFO(this->get_logger(), "Proportional gain (Kp): %.3f", kp_);
+    RCLCPP_INFO(this->get_logger(), "Integral gain (Ki): %.3f", ki_);
     RCLCPP_INFO(this->get_logger(), "PWM range: %d - %d", min_pwm_, max_pwm_);
     RCLCPP_INFO(this->get_logger(), "Control frequency: %.2f Hz", control_freq);
     RCLCPP_INFO(this->get_logger(), "Subscribed to: pressure");
@@ -76,14 +83,14 @@ private:
   void pressure_callback_(const std_msgs::msg::Float32::SharedPtr msg) {
     current_pressure_ = static_cast<double>(msg->data);
     pressure_received_ = true;
-    RCLCPP_INFO(this->get_logger(), "📊 Pressure received: %.2f kPa", current_pressure_);
+    RCLCPP_INFO(this->get_logger(), "Pressure received: %.2f kPa", current_pressure_);
   }
 
   void control_loop() {
     // Check if we've received any pressure data
     if (!pressure_received_) {
       RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-        "⚠️  No pressure data received yet - waiting for pressure sensor...");
+        "No pressure data received yet - waiting for pressure sensor...");
       return;
     }
 
@@ -99,24 +106,31 @@ private:
     // Calculate error
     double error = target_pressure_ - current_pressure_;
 
-    // Calculate proportional control output (P-only controller)
-    double control_output = kp_ * error;
+    // Calculate proportional control output
+    double proportional = kp_ * error;
+
+    // Calculate integral control output (accumulate error over time)
+    integral_error_ += error * dt;
+    double integral = ki_ * integral_error_;
+
+    // Total PI control output
+    double control_output = proportional + integral;
 
     // Debug: Print control calculation details
     RCLCPP_INFO(this->get_logger(),
-      "🎯 Control Loop: Target=%.2f kPa, Current=%.2f kPa, Error=%.2f kPa",
+      "Control Loop: Target=%.2f kPa, Current=%.2f kPa, Error=%.2f kPa",
       target_pressure_, current_pressure_, error);
 
     RCLCPP_INFO(this->get_logger(),
-      "⚙️  P Control: Kp=%.3f, Raw Output=%.2f",
-      kp_, control_output);
+      "PI Control: P=%.2f, I=%.2f, Total=%.2f",
+      proportional, integral, control_output);
 
     // Convert to PWM value (0-100) and apply limits
     int pwm_value = static_cast<int>(std::round(control_output));
 
     // Log before clamping
     RCLCPP_INFO(this->get_logger(),
-      "🔧 PWM Calculation: Raw PWM=%d, Min=%d, Max=%d",
+      "PWM Calculation: Raw PWM=%d, Min=%d, Max=%d",
       pwm_value, min_pwm_, max_pwm_);
 
     // Apply PWM limits
@@ -125,7 +139,7 @@ private:
     // Check if PWM was clamped
     if (clamped_pwm != pwm_value) {
       RCLCPP_WARN(this->get_logger(),
-        "⚠️  PWM clamped from %d to %d", pwm_value, clamped_pwm);
+        "PWM clamped from %d to %d", pwm_value, clamped_pwm);
     }
 
     // Publish PWM value
@@ -135,7 +149,7 @@ private:
 
     // Final control summary
     RCLCPP_INFO(this->get_logger(),
-      "📤 Publishing PWM: %d (dt=%.3fs)", clamped_pwm, dt);
+      "Publishing PWM: %d (dt=%.3fs)", clamped_pwm, dt);
 
     // Print separator for readability
     RCLCPP_INFO(this->get_logger(), "----------------------------------------");
@@ -158,6 +172,11 @@ private:
       else if (param.get_name() == "kp") {
         kp_ = param.as_double();
         RCLCPP_INFO(this->get_logger(), "Updated Kp to: %.3f", kp_);
+      }
+      else if (param.get_name() == "ki") {
+        ki_ = param.as_double();
+        integral_error_ = 0.0; // Reset integral when Ki changes
+        RCLCPP_INFO(this->get_logger(), "Updated Ki to: %.3f", ki_);
       }
       else if (param.get_name() == "max_pwm") {
         max_pwm_ = param.as_int();
@@ -205,11 +224,12 @@ private:
   // Control variables
   double current_pressure_;
   double target_pressure_;
-  double kp_;
+  double kp_, ki_;
   int max_pwm_, min_pwm_;
 
   // Control state variables
   bool pressure_received_;
+  double integral_error_;
   rclcpp::Time last_time_;
 };
 
