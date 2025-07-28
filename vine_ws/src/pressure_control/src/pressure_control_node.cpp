@@ -5,6 +5,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/float64.hpp>
+#include <std_msgs/msg/float32.hpp>
 #include <std_msgs/msg/int32.hpp>
 #include <rcl_interfaces/msg/parameter_descriptor.hpp>
 #include <rcl_interfaces/msg/set_parameters_result.hpp>
@@ -20,16 +21,8 @@ public:
     this->declare_parameter<double>("pressure_target", 0.0, pressure_target_desc);
 
     auto kp_desc = rcl_interfaces::msg::ParameterDescriptor();
-    kp_desc.description = "Proportional gain for PID controller";
+    kp_desc.description = "Proportional gain for P controller";
     this->declare_parameter<double>("kp", 1.0, kp_desc);
-
-    auto ki_desc = rcl_interfaces::msg::ParameterDescriptor();
-    ki_desc.description = "Integral gain for PID controller";
-    this->declare_parameter<double>("ki", 0.1, ki_desc);
-
-    auto kd_desc = rcl_interfaces::msg::ParameterDescriptor();
-    kd_desc.description = "Derivative gain for PID controller";
-    this->declare_parameter<double>("kd", 0.05, kd_desc);
 
     auto control_freq_desc = rcl_interfaces::msg::ParameterDescriptor();
     control_freq_desc.description = "Control loop frequency in Hz";
@@ -47,18 +40,18 @@ public:
     current_pressure_ = 0.0;
     target_pressure_ = this->get_parameter("pressure_target").as_double();
     kp_ = this->get_parameter("kp").as_double();
-    ki_ = this->get_parameter("ki").as_double();
-    kd_ = this->get_parameter("kd").as_double();
     max_pwm_ = this->get_parameter("max_pwm").as_int();
     min_pwm_ = this->get_parameter("min_pwm").as_int();
 
-    integral_error_ = 0.0;
-    previous_error_ = 0.0;
+    pressure_received_ = false;
     last_time_ = this->now();
 
-    // Create subscriber for pressure readings
-    pressure_subscription_ = this->create_subscription<std_msgs::msg::Float64>(
-      "pressure", 10, std::bind(&PressureControlNode::pressure_callback, this, std::placeholders::_1));
+    // Create subscriber for pressure readings - support both Float64 and Float32
+    pressure_subscription_f64_ = this->create_subscription<std_msgs::msg::Float64>(
+      "pressure", 10, std::bind(&PressureControlNode::pressure_callback_f64, this, std::placeholders::_1));
+
+    pressure_subscription_f32_ = this->create_subscription<std_msgs::msg::Float32>(
+      "pressure", 10, std::bind(&PressureControlNode::pressure_callback_f32, this, std::placeholders::_1));
 
     // Create publisher for PWM control
     pwm_publisher_ = this->create_publisher<std_msgs::msg::Int32>("pump_pwm_control", 10);
@@ -73,19 +66,37 @@ public:
     parameter_callback_handle_ = this->add_on_set_parameters_callback(
       std::bind(&PressureControlNode::parameter_callback, this, std::placeholders::_1));
 
-    RCLCPP_INFO(this->get_logger(), "Pressure Control Node initialized");
+    RCLCPP_INFO(this->get_logger(), "=== Pressure Control Node Initialized ===");
+    RCLCPP_INFO(this->get_logger(), "Target pressure: %.2f kPa", target_pressure_);
+    RCLCPP_INFO(this->get_logger(), "Proportional gain (Kp): %.3f", kp_);
+    RCLCPP_INFO(this->get_logger(), "PWM range: %d - %d", min_pwm_, max_pwm_);
+    RCLCPP_INFO(this->get_logger(), "Control frequency: %.2f Hz", control_freq);
     RCLCPP_INFO(this->get_logger(), "Subscribed to: pressure");
     RCLCPP_INFO(this->get_logger(), "Publishing to: pump_pwm_control");
-    RCLCPP_INFO(this->get_logger(), "Control frequency: %.2f Hz", control_freq);
+    RCLCPP_INFO(this->get_logger(), "========================================");
   }
 
 private:
-  void pressure_callback(const std_msgs::msg::Float64::SharedPtr msg) {
+  void pressure_callback_f64(const std_msgs::msg::Float64::SharedPtr msg) {
     current_pressure_ = msg->data;
-    RCLCPP_DEBUG(this->get_logger(), "Received pressure: %.2f kPa", current_pressure_);
+    pressure_received_ = true;
+    RCLCPP_INFO(this->get_logger(), "📊 Pressure received (Float64): %.2f kPa", current_pressure_);
+  }
+
+  void pressure_callback_f32(const std_msgs::msg::Float32::SharedPtr msg) {
+    current_pressure_ = static_cast<double>(msg->data);
+    pressure_received_ = true;
+    RCLCPP_INFO(this->get_logger(), "📊 Pressure received (Float32): %.2f kPa", current_pressure_);
   }
 
   void control_loop() {
+    // Check if we've received any pressure data
+    if (!pressure_received_) {
+      RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+        "⚠️  No pressure data received yet - waiting for pressure sensor...");
+      return;
+    }
+
     // Get current time
     auto current_time = this->now();
     double dt = (current_time - last_time_).seconds();
@@ -98,36 +109,48 @@ private:
     // Calculate error
     double error = target_pressure_ - current_pressure_;
 
-    // Calculate PID terms
-    double proportional = kp_ * error;
+    // Calculate proportional control output (P-only controller)
+    double control_output = kp_ * error;
 
-    integral_error_ += error * dt;
-    double integral = ki_ * integral_error_;
+    // Debug: Print control calculation details
+    RCLCPP_INFO(this->get_logger(),
+      "🎯 Control Loop: Target=%.2f kPa, Current=%.2f kPa, Error=%.2f kPa",
+      target_pressure_, current_pressure_, error);
 
-    double derivative = 0.0;
-    if (dt > 0.0) {
-      derivative = kd_ * (error - previous_error_) / dt;
-    }
-
-    // Calculate total control output
-    double control_output = proportional;
+    RCLCPP_INFO(this->get_logger(),
+      "⚙️  P Control: Kp=%.3f, Raw Output=%.2f",
+      kp_, control_output);
 
     // Convert to PWM value (0-100) and apply limits
-    int pwm_value = static_cast<int>(control_output);
-    pwm_value = std::max(min_pwm_, std::min(max_pwm_, pwm_value));
+    int pwm_value = static_cast<int>(std::round(control_output));
+
+    // Log before clamping
+    RCLCPP_INFO(this->get_logger(),
+      "🔧 PWM Calculation: Raw PWM=%d, Min=%d, Max=%d",
+      pwm_value, min_pwm_, max_pwm_);
+
+    // Apply PWM limits
+    int clamped_pwm = std::max(min_pwm_, std::min(max_pwm_, pwm_value));
+
+    // Check if PWM was clamped
+    if (clamped_pwm != pwm_value) {
+      RCLCPP_WARN(this->get_logger(),
+        "⚠️  PWM clamped from %d to %d", pwm_value, clamped_pwm);
+    }
 
     // Publish PWM value
     auto pwm_msg = std_msgs::msg::Int32();
-    pwm_msg.data = pwm_value;
+    pwm_msg.data = clamped_pwm;
     pwm_publisher_->publish(pwm_msg);
 
-    // Log control information
-    RCLCPP_DEBUG(this->get_logger(),
-      "Control: Error=%.2f, P=%.2f, I=%.2f, D=%.2f, PWM=%d",
-      error, proportional, integral, derivative, pwm_value);
+    // Final control summary
+    RCLCPP_INFO(this->get_logger(),
+      "📤 Publishing PWM: %d (dt=%.3fs)", clamped_pwm, dt);
+
+    // Print separator for readability
+    RCLCPP_INFO(this->get_logger(), "----------------------------------------");
 
     // Update for next iteration
-    previous_error_ = error;
     last_time_ = current_time;
   }
 
@@ -145,15 +168,6 @@ private:
       else if (param.get_name() == "kp") {
         kp_ = param.as_double();
         RCLCPP_INFO(this->get_logger(), "Updated Kp to: %.3f", kp_);
-      }
-      else if (param.get_name() == "ki") {
-        ki_ = param.as_double();
-        integral_error_ = 0.0; // Reset integral when Ki changes
-        RCLCPP_INFO(this->get_logger(), "Updated Ki to: %.3f", ki_);
-      }
-      else if (param.get_name() == "kd") {
-        kd_ = param.as_double();
-        RCLCPP_INFO(this->get_logger(), "Updated Kd to: %.3f", kd_);
       }
       else if (param.get_name() == "max_pwm") {
         max_pwm_ = param.as_int();
@@ -193,7 +207,8 @@ private:
   }
 
   // Member variables
-  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr pressure_subscription_;
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr pressure_subscription_f64_;
+  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr pressure_subscription_f32_;
   rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr pwm_publisher_;
   rclcpp::TimerBase::SharedPtr control_timer_;
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr parameter_callback_handle_;
@@ -201,12 +216,11 @@ private:
   // Control variables
   double current_pressure_;
   double target_pressure_;
-  double kp_, ki_, kd_;
+  double kp_;
   int max_pwm_, min_pwm_;
 
-  // PID state variables
-  double integral_error_;
-  double previous_error_;
+  // Control state variables
+  bool pressure_received_;
   rclcpp::Time last_time_;
 };
 
