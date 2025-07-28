@@ -101,13 +101,13 @@ private:
     // Calculate PID terms
     double proportional = kp_ * error;
 
-    // integral_error_ += error * dt;
-    // double integral = ki_ * integral_error_;
+    integral_error_ += error * dt;
+    double integral = ki_ * integral_error_;
 
-    // double derivative = 0.0;
-    // if (dt > 0.0) {
-    //   derivative = kd_ * (error - previous_error_) / dt;
-    // }
+    double derivative = 0.0;
+    if (dt > 0.0) {
+      derivative = kd_ * (error - previous_error_) / dt;
+    }
 
     // Calculate total control output
     double control_output = proportional;
