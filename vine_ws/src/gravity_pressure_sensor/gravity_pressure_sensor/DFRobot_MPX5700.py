@@ -47,7 +47,7 @@ class DFRobot_MPX5700(object):
     sbuf = [0]*1
     sbuf[0] = ifcalibration
     self.write_reg(0x09,sbuf)
-    time.sleep(0.02)  # Reduced from 1s to 20ms
+    time.sleep(0.04)  # Reduced from 1s to 40ms
     buf = self.read_reg(0x06,2)
     time.sleep(0.02)  # Reduced from 1s to 20ms
     try:
