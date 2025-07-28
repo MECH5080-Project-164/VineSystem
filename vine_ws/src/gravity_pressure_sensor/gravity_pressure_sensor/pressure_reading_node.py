@@ -22,7 +22,7 @@ class PressureSensorNode(Node):
         i2c_bus = 1
         i2c_address = 0x16
         self.publish_rate_hz = 10
-        self.mean_sample_size = 10
+        self.mean_sample_size = 2
 
 
         self.get_logger().info('Pressure sensor node started')
