@@ -4,7 +4,6 @@
 #include <memory>
 
 #include <rclcpp/rclcpp.hpp>
-#include <std_msgs/msg/float64.hpp>
 #include <std_msgs/msg/float32.hpp>
 #include <std_msgs/msg/int32.hpp>
 #include <rcl_interfaces/msg/parameter_descriptor.hpp>
@@ -46,12 +45,9 @@ public:
     pressure_received_ = false;
     last_time_ = this->now();
 
-    // Create subscriber for pressure readings - support both Float64 and Float32
-    pressure_subscription_f64_ = this->create_subscription<std_msgs::msg::Float64>(
-      "pressure", 10, std::bind(&PressureControlNode::pressure_callback_f64, this, std::placeholders::_1));
-
-    pressure_subscription_f32_ = this->create_subscription<std_msgs::msg::Float32>(
-      "pressure", 10, std::bind(&PressureControlNode::pressure_callback_f32, this, std::placeholders::_1));
+    // Create subscriber for pressure readings
+    pressure_subscription_ = this->create_subscription<std_msgs::msg::Float32>(
+      "pressure", 10, std::bind(&PressureControlNode::pressure_callback_, this, std::placeholders::_1));
 
     // Create publisher for PWM control
     pwm_publisher_ = this->create_publisher<std_msgs::msg::Int32>("pump_pwm_control", 10);
@@ -77,16 +73,10 @@ public:
   }
 
 private:
-  void pressure_callback_f64(const std_msgs::msg::Float64::SharedPtr msg) {
-    current_pressure_ = msg->data;
-    pressure_received_ = true;
-    RCLCPP_INFO(this->get_logger(), "📊 Pressure received (Float64): %.2f kPa", current_pressure_);
-  }
-
-  void pressure_callback_f32(const std_msgs::msg::Float32::SharedPtr msg) {
+  void pressure_callback_(const std_msgs::msg::Float32::SharedPtr msg) {
     current_pressure_ = static_cast<double>(msg->data);
     pressure_received_ = true;
-    RCLCPP_INFO(this->get_logger(), "📊 Pressure received (Float32): %.2f kPa", current_pressure_);
+    RCLCPP_INFO(this->get_logger(), "📊 Pressure received: %.2f kPa", current_pressure_);
   }
 
   void control_loop() {
@@ -207,8 +197,7 @@ private:
   }
 
   // Member variables
-  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr pressure_subscription_f64_;
-  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr pressure_subscription_f32_;
+  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr pressure_subscription_;
   rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr pwm_publisher_;
   rclcpp::TimerBase::SharedPtr control_timer_;
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr parameter_callback_handle_;
