@@ -21,8 +21,8 @@ class PressureSensorNode(Node):
 
         i2c_bus = 1
         i2c_address = 0x16
-        self.publish_rate_hz = 10
-        self.mean_sample_size = 2
+        self.publish_rate_hz = 50  # Increased from 10 to 50 Hz for faster readings
+        self.mean_sample_size = 1  # Reduced from 2 to 1 for minimal averaging delay
 
 
         self.get_logger().info('Pressure sensor node started')
@@ -48,6 +48,10 @@ class PressureSensorNode(Node):
         timer_period = 1.0 / self.publish_rate_hz  # seconds
         self.timer = self.create_timer(timer_period, self.publish_pressure)
 
+        # Counter for throttled logging
+        self.log_counter = 0
+        self.log_every_n = 10  # Log every 10th reading (at 50Hz = 5Hz log rate)
+
     def publish_pressure(self):
         msg = Float32()
 
@@ -56,7 +60,13 @@ class PressureSensorNode(Node):
                 # Read pressure value in kPa
                 pressure_kpa = self.pressure_sensor.get_pressure_value_kpa(1)
                 msg.data = float(pressure_kpa)
-                self.get_logger().info(f'Publishing pressure: {msg.data:.2f} kPa')
+
+                # Throttle logging to avoid console spam at 50Hz
+                self.log_counter += 1
+                if self.log_counter >= self.log_every_n:
+                    self.get_logger().info(f'Publishing pressure: {msg.data:.2f} kPa (Rate: {self.publish_rate_hz}Hz)')
+                    self.log_counter = 0
+
             except Exception as e:
                 self.get_logger().error(f'Error reading pressure sensor: {str(e)}')
                 msg.data = -1.0  # Error value
