@@ -94,6 +94,12 @@ private:
       return;
     }
 
+    // If pressure data is -1.0, we've an error, skip this iteration
+    if (current_pressure_ < 0.0) {
+      RCLCPP_ERROR(this->get_logger(), "Invalid pressure reading: %.2f kPa", current_pressure_);
+      return;
+    }
+
     // Get current time
     auto current_time = this->now();
     double dt = (current_time - last_time_).seconds();

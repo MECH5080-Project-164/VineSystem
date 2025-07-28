@@ -47,10 +47,14 @@ class DFRobot_MPX5700(object):
     sbuf = [0]*1
     sbuf[0] = ifcalibration
     self.write_reg(0x09,sbuf)
-    time.sleep(0.01)  # Reduced from 1s to 10ms
+    time.sleep(0.02)  # Reduced from 1s to 20ms
     buf = self.read_reg(0x06,2)
     time.sleep(0.01)  # Reduced from 1s to 10ms
-    Pressure_100 = (buf[0] << 8) | buf[1]
+    try:
+      Pressure_100 = (buf[0] << 8) | buf[1]
+    except Exception as e:
+      print("Error reading pressure data:", str(e))
+      return -1.0
     return (Pressure_100/100.0)
 
   def calibration_kpa(self,standard_values):
