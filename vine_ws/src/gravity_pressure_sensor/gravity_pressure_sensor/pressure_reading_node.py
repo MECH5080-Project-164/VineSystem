@@ -8,16 +8,22 @@ class PressureSensorNode(Node):
         super().__init__('pressure_sensor_node')
 
         # Parameters for the pressure sensor
-        self.declare_parameter('i2c_bus', 1)
-        self.declare_parameter('i2c_address', 0x16)
-        self.declare_parameter('publish_rate_hz', 1.0)
-        self.declare_parameter('mean_sample_size', 10)
+        # self.declare_parameter('i2c_bus', 1)
+        # self.declare_parameter('i2c_address', 0x16)
+        # self.declare_parameter('publish_rate_hz', 1.0)
+        # self.declare_parameter('mean_sample_size', 10)
 
-        # Get parameters
-        i2c_bus = self.get_parameter('i2c_bus').as_int()
-        i2c_address = self.get_parameter('i2c_address').as_int()
-        self.publish_rate_hz = self.get_parameter('publish_rate_hz').as_double()
-        self.mean_sample_size = self.get_parameter('mean_sample_size').as_int()
+        # # Get parameters
+        # i2c_bus = self.get_parameter('i2c_bus').get_parameter_value().value
+        # i2c_address = self.get_parameter('i2c_address').get_parameter_value().value
+        # self.publish_rate_hz = self.get_parameter('publish_rate_hz').get_parameter_value().value
+        # self.mean_sample_size = self.get_parameter('mean_sample_size').get_parameter_value().value
+
+        i2c_bus = 1
+        i2c_address = 0x16
+        self.publish_rate_hz = 10
+        self.mean_sample_size = 10
+
 
         self.get_logger().info('Pressure sensor node started')
         self.get_logger().info(
