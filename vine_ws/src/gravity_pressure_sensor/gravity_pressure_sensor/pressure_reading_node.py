@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32
-from .DFRobot_MPX5700_optimized import DFRobot_MPX5700_I2C_Optimized
+from .DFRobot_MPX5700 import DFRobot_MPX5700_I2C
 
 class PressureSensorNode(Node):
     def __init__(self):
@@ -10,7 +10,7 @@ class PressureSensorNode(Node):
         # Parameters for the pressure sensor
         self.declare_parameter('i2c_bus', 1)
         self.declare_parameter('i2c_address', 0x16)
-        self.declare_parameter('publish_rate_hz', 50.0)  # Increased default to 50Hz
+        self.declare_parameter('publish_rate_hz', 1.0)
         self.declare_parameter('mean_sample_size', 10)
 
         # Get parameters
@@ -28,7 +28,7 @@ class PressureSensorNode(Node):
         # Initialise the pressure sensor
         # I2C bus 1, sensor address 0x16
         try:
-            self.pressure_sensor = DFRobot_MPX5700_I2C_Optimized(i2c_bus, i2c_address)
+            self.pressure_sensor = DFRobot_MPX5700_I2C(i2c_bus, i2c_address)
             self.pressure_sensor.set_mean_sample_size(self.mean_sample_size)
             self.get_logger().info('Pressure sensor initialized successfully')
         except Exception as e:
@@ -47,17 +47,10 @@ class PressureSensorNode(Node):
 
         if self.pressure_sensor is not None:
             try:
-                # Use the faster pressure reading method
-                pressure_kpa = self.pressure_sensor.get_pressure_value_kpa_fast()
-                if pressure_kpa != -1.0:
-                    msg.data = float(pressure_kpa)
-                    # Reduce logging frequency to avoid spam at 50Hz
-                    if self.get_clock().now().nanoseconds % 1000000000 < 50000000:  # Log ~once per second
-                        self.get_logger().info(f'Publishing pressure: {msg.data:.2f} kPa')
-                else:
-                    # Fallback to original method if fast method fails
-                    pressure_kpa = self.pressure_sensor.get_pressure_value_kpa(1)
-                    msg.data = float(pressure_kpa)
+                # Read pressure value in kPa
+                pressure_kpa = self.pressure_sensor.get_pressure_value_kpa(1)
+                msg.data = float(pressure_kpa)
+                self.get_logger().info(f'Publishing pressure: {msg.data:.2f} kPa')
             except Exception as e:
                 self.get_logger().error(f'Error reading pressure sensor: {str(e)}')
                 msg.data = -1.0  # Error value
