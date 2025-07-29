@@ -17,7 +17,7 @@ public:
     // Declare parameters with descriptions
     auto pressure_target_desc = rcl_interfaces::msg::ParameterDescriptor();
     pressure_target_desc.description = "Target pressure value in kPa";
-    this->declare_parameter<double>("pressure_target", 100.0, pressure_target_desc);
+    this->declare_parameter<double>("target_pressure", 100.0, pressure_target_desc);
 
     auto kp_desc = rcl_interfaces::msg::ParameterDescriptor();
     kp_desc.description = "Proportional gain for PI controller";
@@ -41,11 +41,11 @@ public:
 
     auto min_pwm_desc = rcl_interfaces::msg::ParameterDescriptor();
     min_pwm_desc.description = "Minimum PWM value (0-100)";
-    this->declare_parameter<int>("min_pwm", 0, min_pwm_desc);
+    this->declare_parameter<int>("min_pwm", 15, min_pwm_desc);
 
     // Initialise variables
     current_pressure_ = 0.0;
-    target_pressure_ = this->get_parameter("pressure_target").as_double();
+    target_pressure_ = this->get_parameter("target_pressure").as_double();
     kp_ = this->get_parameter("kp").as_double();
     ki_ = this->get_parameter("ki").as_double();
     max_integral_ = this->get_parameter("max_integral").as_double();
@@ -162,7 +162,7 @@ private:
     result.successful = true;
 
     for (const auto & param : parameters) {
-      if (param.get_name() == "pressure_target") {
+      if (param.get_name() == "target_pressure") {
         target_pressure_ = param.as_double();
         RCLCPP_INFO(this->get_logger(), "Updated target pressure to: %.2f kPa", target_pressure_);
       }
