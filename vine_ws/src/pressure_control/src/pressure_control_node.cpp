@@ -145,7 +145,20 @@ private:
 
     // Convert to PWM value (0-100) and apply limits
     int pwm_value = static_cast<int>(std::round(control_output));
-    int clamped_pwm = std::max(min_pwm_, std::min(max_pwm_, pwm_value));
+    int clamped_pwm;
+
+    if (pwm_value > max_pwm_) {
+      clamped_pwm = max_pwm_;
+    } else if (pwm_value < min_pwm_) {
+      // Choose between 0 and min_pwm based on which is closer
+      if (pwm_value < min_pwm_ / 2) {
+        clamped_pwm = 0;
+      } else {
+        clamped_pwm = min_pwm_;
+      }
+    } else {
+      clamped_pwm = pwm_value;
+    }
 
     // Single-line compact control summary
     RCLCPP_INFO(this->get_logger(),
