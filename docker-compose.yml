@@ -1,7 +1,7 @@
 services:
   vine_system:
     image: ${IMAGE_NAME:-vine_system:latest}
-    container_name: ${CONTAINER_NAME:-ros2_container}
+    container_name: ${CONTAINER_NAME:-vine-docker}
     privileged: true
     network_mode: "host"
     hostname: vine-docker
