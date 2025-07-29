@@ -28,6 +28,11 @@ services:
 
     working_dir: ${MOUNT_POINT:-/home/workspace}
 
+    # Print to console how to enter the container
+    command: >
+      echo "Container started. Use 'docker exec -it ${CONTAINER_NAME:-vine-docker} bash' to enter the container." &&
+      echo "Mount point is ${MOUNT_POINT:-/home/workspace}."
+
     # Keep the container running
     stdin_open: true
     tty: true
