@@ -129,7 +129,7 @@ if ! command -v ros2 &> /dev/null; then
 fi
 
 # Check if micro_ros_agent package is available
-if ! ros2 pkg list | grep -q micro_ros_agent; then
+if ! ros2 pkg list 2>/dev/null | grep -q micro_ros_agent 2>/dev/null; then
     echo -e "${RED}Error: micro_ros_agent package not found.${NC}" >&2
     echo "Install it with: sudo apt install ros-${ROS_DISTRO}-micro-ros-agent"
     exit 1
