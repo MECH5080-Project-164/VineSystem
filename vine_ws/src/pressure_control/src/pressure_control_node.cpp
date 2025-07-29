@@ -24,8 +24,12 @@ public:
     this->declare_parameter<double>("kp", 0.5, kp_desc);
 
     auto ki_desc = rcl_interfaces::msg::ParameterDescriptor();
-    ki_desc.description = "Integral gain for PI controller";
+    ki_desc.description = "Integral gain for PID controller";
     this->declare_parameter<double>("ki", 0.1, ki_desc);
+
+    auto kd_desc = rcl_interfaces::msg::ParameterDescriptor();
+    kd_desc.description = "Derivative gain for PID controller";
+    this->declare_parameter<double>("kd", 0.05, kd_desc);
 
     auto max_integral_desc = rcl_interfaces::msg::ParameterDescriptor();
     max_integral_desc.description = "Maximum integral error accumulation (prevents windup)";
@@ -48,12 +52,14 @@ public:
     target_pressure_ = this->get_parameter("target_pressure").as_double();
     kp_ = this->get_parameter("kp").as_double();
     ki_ = this->get_parameter("ki").as_double();
+    kd_ = this->get_parameter("kd").as_double();
     max_integral_ = this->get_parameter("max_integral").as_double();
     max_pwm_ = this->get_parameter("max_pwm").as_int();
     min_pwm_ = this->get_parameter("min_pwm").as_int();
 
     pressure_received_ = false;
     integral_error_ = 0.0;
+    previous_error_ = 0.0;
     last_time_ = this->now();
 
     // Create subscriber for pressure readings
@@ -77,6 +83,7 @@ public:
     RCLCPP_INFO(this->get_logger(), "Target pressure: %.2f kPa", target_pressure_);
     RCLCPP_INFO(this->get_logger(), "Proportional gain (Kp): %.3f", kp_);
     RCLCPP_INFO(this->get_logger(), "Integral gain (Ki): %.3f", ki_);
+    RCLCPP_INFO(this->get_logger(), "Derivative gain (Kd): %.3f", kd_);
     RCLCPP_INFO(this->get_logger(), "Max integral error: %.2f", max_integral_);
     RCLCPP_INFO(this->get_logger(), "PWM range: %d - %d", min_pwm_, max_pwm_);
     RCLCPP_INFO(this->get_logger(), "Control frequency: %.2f Hz", control_freq);
@@ -129,8 +136,12 @@ private:
 
     double integral = ki_ * integral_error_;
 
-    // Total PI control output
-    double control_output = proportional + integral;
+    // Calculate derivative control output (rate of change of error)
+    double derivative_error = (error - previous_error_) / dt;
+    double derivative = kd_ * derivative_error;
+
+    // Total PID control output
+    double control_output = proportional + integral + derivative;
 
     // Convert to PWM value (0-100) and apply limits
     int pwm_value = static_cast<int>(std::round(control_output));
@@ -138,8 +149,8 @@ private:
 
     // Single-line compact control summary
     RCLCPP_INFO(this->get_logger(),
-      "Target: %.1f kPa | Current: %.1f kPa | Error: %.1f | P: %.1f | I: %.1f | PWM: %d",
-      target_pressure_, current_pressure_, error, proportional, integral, clamped_pwm);
+      "Target: %.1f kPa | Current: %.1f kPa | Error: %.1f | P: %.1f | I: %.1f | D: %.1f | PWM: %d",
+      target_pressure_, current_pressure_, error, proportional, integral, derivative, clamped_pwm);
 
     // Warn if PWM was clamped
     if (clamped_pwm != pwm_value) {
@@ -152,6 +163,7 @@ private:
     pwm_publisher_->publish(pwm_msg);
 
     // Update for next iteration
+    previous_error_ = error;
     last_time_ = current_time;
   }
 
@@ -174,6 +186,11 @@ private:
         ki_ = param.as_double();
         integral_error_ = 0.0; // Reset integral when Ki changes
         RCLCPP_INFO(this->get_logger(), "Updated Ki to: %.3f", ki_);
+      }
+      else if (param.get_name() == "kd") {
+        kd_ = param.as_double();
+        previous_error_ = 0.0; // Reset derivative when Kd changes
+        RCLCPP_INFO(this->get_logger(), "Updated Kd to: %.3f", kd_);
       }
       else if (param.get_name() == "max_integral") {
         max_integral_ = param.as_double();
@@ -227,13 +244,14 @@ private:
   // Control variables
   double current_pressure_;
   double target_pressure_;
-  double kp_, ki_;
+  double kp_, ki_, kd_;
   double max_integral_;
   int max_pwm_, min_pwm_;
 
   // Control state variables
   bool pressure_received_;
   double integral_error_;
+  double previous_error_;
   rclcpp::Time last_time_;
 };
 
