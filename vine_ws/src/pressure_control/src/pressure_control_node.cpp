@@ -37,7 +37,7 @@ public:
 
     auto control_freq_desc = rcl_interfaces::msg::ParameterDescriptor();
     control_freq_desc.description = "Control loop frequency in Hz";
-    this->declare_parameter<double>("control_frequency", 10.0, control_freq_desc);
+    this->declare_parameter<double>("control_frequency", 50.0, control_freq_desc);
 
     auto max_pwm_desc = rcl_interfaces::msg::ParameterDescriptor();
     max_pwm_desc.description = "Maximum PWM value (0-100)";
@@ -46,6 +46,10 @@ public:
     auto min_pwm_desc = rcl_interfaces::msg::ParameterDescriptor();
     min_pwm_desc.description = "Minimum PWM value (0-100)";
     this->declare_parameter<int>("min_pwm", 15, min_pwm_desc);
+
+    auto debug_force_pwm_desc = rcl_interfaces::msg::ParameterDescriptor();
+    debug_force_pwm_desc.description = "Debug: Force PWM to always output this value (set to -1 to disable)";
+    this->declare_parameter<int>("debug_force_pwm", -1, debug_force_pwm_desc);
 
     // Initialise variables
     current_pressure_ = 0.0;
@@ -56,6 +60,7 @@ public:
     max_integral_ = this->get_parameter("max_integral").as_double();
     max_pwm_ = this->get_parameter("max_pwm").as_int();
     min_pwm_ = this->get_parameter("min_pwm").as_int();
+    debug_force_pwm_ = this->get_parameter("debug_force_pwm").as_int();
 
     pressure_received_ = false;
     integral_error_ = 0.0;
@@ -87,6 +92,9 @@ public:
     RCLCPP_INFO(this->get_logger(), "Max integral error: %.2f", max_integral_);
     RCLCPP_INFO(this->get_logger(), "PWM range: %d - %d", min_pwm_, max_pwm_);
     RCLCPP_INFO(this->get_logger(), "Control frequency: %.2f Hz", control_freq);
+    if (debug_force_pwm_ >= 0) {
+      RCLCPP_WARN(this->get_logger(), "DEBUG MODE: Forcing PWM to %d", debug_force_pwm_);
+    }
     RCLCPP_INFO(this->get_logger(), "Subscribed to: pressure");
     RCLCPP_INFO(this->get_logger(), "Publishing to: pump_pwm_control");
     RCLCPP_INFO(this->get_logger(), "========================================");
@@ -147,23 +155,34 @@ private:
     int pwm_value = static_cast<int>(std::round(control_output));
     int clamped_pwm;
 
-    if (pwm_value > max_pwm_) {
-      clamped_pwm = max_pwm_;
-    } else if (pwm_value < min_pwm_) {
-      // Choose between 0 and min_pwm based on which is closer
-      if (pwm_value < min_pwm_ / 2) {
-        clamped_pwm = 0;
-      } else {
-        clamped_pwm = min_pwm_;
-      }
+    // Check if debug force PWM is enabled
+    if (debug_force_pwm_ >= 0) {
+      clamped_pwm = debug_force_pwm_;
     } else {
-      clamped_pwm = pwm_value;
+      if (pwm_value > max_pwm_) {
+        clamped_pwm = max_pwm_;
+      } else if (pwm_value < min_pwm_) {
+        // Choose between 0 and min_pwm based on which is closer
+        if (pwm_value < min_pwm_ / 2) {
+          clamped_pwm = 0;
+        } else {
+          clamped_pwm = min_pwm_;
+        }
+      } else {
+        clamped_pwm = pwm_value;
+      }
     }
 
     // Single-line compact control summary
-    RCLCPP_INFO(this->get_logger(),
-      "Target: %.1f kPa | Current: %.1f kPa | Error: %.1f | P: %.1f | I: %.1f | D: %.1f | PWM: %d",
-      target_pressure_, current_pressure_, error, proportional, integral, derivative, clamped_pwm);
+    if (debug_force_pwm_ >= 0) {
+      RCLCPP_INFO(this->get_logger(),
+        "DEBUG MODE - Target: %.1f kPa | Current: %.1f kPa | Error: %.1f | P: %.1f | I: %.1f | D: %.1f | PWM: %d (FORCED)",
+        target_pressure_, current_pressure_, error, proportional, integral, derivative, clamped_pwm);
+    } else {
+      RCLCPP_INFO(this->get_logger(),
+        "Target: %.1f kPa | Current: %.1f kPa | Error: %.1f | P: %.1f | I: %.1f | D: %.1f | PWM: %d",
+        target_pressure_, current_pressure_, error, proportional, integral, derivative, clamped_pwm);
+    }
 
     // Warn if PWM was clamped
     if (clamped_pwm != pwm_value) {
@@ -229,6 +248,14 @@ private:
         }
         RCLCPP_INFO(this->get_logger(), "Updated min PWM to: %d", min_pwm_);
       }
+      else if (param.get_name() == "debug_force_pwm") {
+        debug_force_pwm_ = param.as_int();
+        if (debug_force_pwm_ >= 0) {
+          RCLCPP_WARN(this->get_logger(), "DEBUG MODE ENABLED: Forcing PWM to %d", debug_force_pwm_);
+        } else {
+          RCLCPP_INFO(this->get_logger(), "DEBUG MODE DISABLED: Normal PID control resumed");
+        }
+      }
       else if (param.get_name() == "control_frequency") {
         double new_freq = param.as_double();
         if (new_freq <= 0.0) {
@@ -260,6 +287,7 @@ private:
   double kp_, ki_, kd_;
   double max_integral_;
   int max_pwm_, min_pwm_;
+  int debug_force_pwm_;
 
   // Control state variables
   bool pressure_received_;
