@@ -21,15 +21,15 @@ public:
 
     auto kp_desc = rcl_interfaces::msg::ParameterDescriptor();
     kp_desc.description = "Proportional gain for PI controller";
-    this->declare_parameter<double>("kp", 0.5, kp_desc);
+    this->declare_parameter<double>("kp", 5.0, kp_desc);
 
     auto ki_desc = rcl_interfaces::msg::ParameterDescriptor();
     ki_desc.description = "Integral gain for PID controller";
-    this->declare_parameter<double>("ki", 0.1, ki_desc);
+    this->declare_parameter<double>("ki", 1.0, ki_desc);
 
     auto kd_desc = rcl_interfaces::msg::ParameterDescriptor();
     kd_desc.description = "Derivative gain for PID controller";
-    this->declare_parameter<double>("kd", 0.05, kd_desc);
+    this->declare_parameter<double>("kd", 0.5, kd_desc);
 
     auto max_integral_desc = rcl_interfaces::msg::ParameterDescriptor();
     max_integral_desc.description = "Maximum integral error accumulation (prevents windup)";
