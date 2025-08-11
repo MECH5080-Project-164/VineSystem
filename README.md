@@ -12,7 +12,7 @@
 
 ## Raspbian
 
-Mostly, we use Raspbian as it is out of the box. We have only made a change to the `/boot/firmware/config.txt` file to enable the camera and another to enable the external PCIe port. The file was modified as such:
+Mostly, we use Raspbian as it is out of the box. We edit `/boot/firmware/config.txt` file to enable the camera and another to enable the external PCIe port. The file was modified as such:
 
 ```bash
 - camera_auto_detect=1
@@ -46,6 +46,25 @@ PCIE_PROBE=1
 ```
 
 Once these changes are made, it is recommended to reboot the Raspberry Pi to ensure that the changes take effect.
+
+### UART Configuration
+
+To enable UART on the Raspberry Pi for communicating with the Pi Pico, you need to modify the `/boot/firmware/config.txt` file, adding the following line:
+
+```bash
+# Enable UART
+enable_uart=1
+```
+
+We then need to ensure that the UART is not being used by the console. We can do this through the `raspi-config` tool:
+
+```bash
+sudo raspi-config
+```
+
+Navigate to `Interface Options` -> `Serial Port` and disable the login shell over serial and enable the serial port hardware [source](www.raspberrypi.com/documentation/computers/configuration.html#disabling-the-linux-serial-console).
+
+We prefer to communicate over the primary UART which defaults to GPIO 14 (TX) and GPIO 15 (RX).
 
 ## Docker
 
