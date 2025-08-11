@@ -4,14 +4,16 @@ Quick reference for launching and operating the complete VineSystem with pressur
 
 ## Quick Start
 
+### 0. Prerequisites
+
+- (Optional) Enter `tmux` or similar terminal multiplexer for better terminal management.
+- Enter `~/students/VineSystem` directory in your terminal.
+
 ### 1. Launch Docker Environment
 
 ```bash
-# Start the Docker container
-./scripts/vine_system_start.sh
-
-# OR manually with docker-compose
-docker-compose up -d
+# Start docker container with docker-compose
+docker compose up -d
 ```
 
 ### 2. Enter Container
