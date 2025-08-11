@@ -2,7 +2,7 @@
 
 # --- Configuration ---
 IMAGE_NAME="vine_system:latest"     # Docker image name
-CONTAINER_NAME="ros2_container"     # Container name
+CONTAINER_NAME="vine-docker"        # Container name
 MOUNT_POINT="/home/workspace"       # Where to mount inside the container
 BIND_DIR="/home/$(whoami)"          # Host directory to bind mount
 

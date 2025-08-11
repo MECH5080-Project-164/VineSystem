@@ -36,7 +36,7 @@ class DFRobot_MPX5700(object):
     buf = [0]*1
     buf[0] = size
     self.write_reg(0x05, buf)
-    time.sleep(0.5)
+    time.sleep(0.05)  # Reduced from 0.5s to 50ms
 
   def get_pressure_value_kpa(self,ifcalibration):
     '''
@@ -47,10 +47,14 @@ class DFRobot_MPX5700(object):
     sbuf = [0]*1
     sbuf[0] = ifcalibration
     self.write_reg(0x09,sbuf)
-    time.sleep(1)
+    time.sleep(0.04)  # Reduced from 1s to 40ms
     buf = self.read_reg(0x06,2)
-    time.sleep(1)
-    Pressure_100 = (buf[0] << 8) | buf[1]
+    time.sleep(0.02)  # Reduced from 1s to 20ms
+    try:
+      Pressure_100 = (buf[0] << 8) | buf[1]
+    except Exception as e:
+      print("Error reading pressure data:", str(e))
+      return -1.0
     return (Pressure_100/100.0)
 
   def calibration_kpa(self,standard_values):
@@ -88,14 +92,13 @@ class DFRobot_MPX5700_I2C(DFRobot_MPX5700):
       @param reg register address
       @param value written data
     '''
-    while 1:
-      try:
-        self.i2cbus.write_i2c_block_data(self.__addr ,reg ,data)
-        return
-      except:
-        print("please check connect!")
-        time.sleep(1)
-        return
+    try:
+      self.i2cbus.write_i2c_block_data(self.__addr ,reg ,data)
+      return
+    except:
+      print("please check connect!")
+      time.sleep(0.01)  # Reduced from 1s to 10ms
+      return
 
   def read_reg(self, reg ,len):
     '''
