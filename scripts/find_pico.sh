@@ -81,6 +81,23 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Fast path: if the primary UART /dev/ttyAMA0 exists, use it directly unless --all requested
+if [ -e /dev/ttyAMA0 ] && [ "$SHOW_ALL" = false ]; then
+    if [ "$SHOW_AGENT" = true ]; then
+        echo "ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyAMA0"
+        exit 0
+    fi
+    if [ "$SHOW_FIRST" = true ]; then
+        echo "/dev/ttyAMA0"
+        exit 0
+    fi
+    echo -e "${GREEN}Found device:${NC} /dev/ttyAMA0"
+    echo "  Vendor: UART"
+    echo "  Model: Onboard_Primary_UART"
+    echo -e "  ${BLUE}Type: UART (On-board preferred)${NC}"
+    echo ""
+fi
+
 # Gather devices
 if [ "$SHOW_ALL" = true ]; then
     devices=( $(find_pico_devices "all") )
