@@ -27,13 +27,13 @@ public:
     this->declare_parameter<int64_t>("pwm_range", 499); // For 50kHz PWM frequency
     this->declare_parameter<int64_t>("pwm_clock", 1); // For 50kHz PWM frequency
 
-    // Create a subscriber to the "vine_led_control" topic
+    // Create a subscriber to the "led_control/vine" topic
     subscription_ = this->create_subscription<VineLed>(
-      "vine_led_control", 10,
+      "led_control/vine", 10,
       std::bind(&LedControlVine::led_control_callback, this, std::placeholders::_1));
 
     RCLCPP_INFO(this->get_logger(), "LedControlVine node has been started.");
-    RCLCPP_INFO(this->get_logger(), "Waiting for messages on 'vine_led_control' topic...");
+    RCLCPP_INFO(this->get_logger(), "Waiting for messages on 'led_control/vine' topic...");
 
     // Initialise wiringPi
     if (wiringPiSetupPinType(WPI_PIN_BCM) == -1) {

@@ -20,13 +20,13 @@ public:
     this->declare_parameter<int64_t>("pwm_range", 1024);
     this->declare_parameter<int64_t>("pwm_clock", 1);
 
-    // Create a subscriber to the "chassis_led_control" topic
+    // Create a subscriber to the "led_control/chassis" topic
     subscription_ = this->create_subscription<ChassisLed>(
-      "chassis_led_control", 10,
+      "led_control/chassis", 10,
       std::bind(&LedControlChassis::led_control_callback, this, std::placeholders::_1));
 
     RCLCPP_INFO(this->get_logger(), "LedControlChassis node has been started.");
-    RCLCPP_INFO(this->get_logger(), "Waiting for messages on 'chassis_led_control' topic...");
+    RCLCPP_INFO(this->get_logger(), "Waiting for messages on 'led_control/chassis' topic...");
 
     // Initialise wiringPi
     if (wiringPiSetupPinType(WPI_PIN_BCM) == -1) {

@@ -53,11 +53,11 @@ To determine the payload format, you can refer to the message definitions in the
 For a Vine LED payload, which has a brightness and duration to protect the LED, you can use:
 
 ```bash
-ros2 topic pub -1 /vine_led_control vine_interfaces/msg/VineLed "{duration: 100, brightness: 50}"
+ros2 topic pub -1 /led_control/vine vine_interfaces/msg/VineLed "{duration: 100, brightness: 50}"
 ```
 
 For a Chassis LED payload, which only has a brightness, you can use:
 
 ```bash
-ros2 topic pub -1 /chassis_led_control vine_interfaces/msg/ChassisLed "{brightness: 50}"
+ros2 topic pub -1 /led_control/chassis vine_interfaces/msg/ChassisLed "{brightness: 50}"
 ```
