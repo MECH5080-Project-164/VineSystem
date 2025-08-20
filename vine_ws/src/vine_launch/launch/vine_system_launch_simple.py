@@ -11,10 +11,10 @@ Launches all nodes required for the vine robotic system including:
 """
 
 import os
-from launch import LaunchConfiguration, LaunchDescription
+from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, LogInfo
 from launch.conditions import IfCondition
-
+from launch.substitutions import LaunchConfiguration
 
 def generate_launch_description():
     """Generate launch description for the complete vine system."""
