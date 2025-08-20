@@ -57,15 +57,18 @@ if ! ros2 pkg list 2>/dev/null | grep -q led_control_chassis 2>/dev/null; then
     exit 1
 fi
 
-echo -e "${GREEN}Chassis LED command (brightness: ${BRIGHTNESS})${NC}"
+echo -e "${GREEN}Starting chassis LED node (brightness: ${BRIGHTNESS})${NC}"
 echo ""
 
-# If the led_control_chassis node is already running, publish the brightness to the topic
+# If the node is already running, inform and exit — this script's job is to start the node
 if ros2 node list 2>/dev/null | grep -q "led_control_chassis"; then
-    echo -e "${YELLOW}Detected running node 'led_control_chassis' — publishing to /led_control/chassis${NC}"
-    exec ros2 topic pub /led_control/chassis vine_interfaces/msg/ChassisLed "{brightness: $BRIGHTNESS}" -1
-else
-    echo -e "${YELLOW}Node not running — starting led_control_chassis node with brightness param. Press Ctrl+C to stop${NC}"
-    echo ""
+    echo -e "${YELLOW}Node 'led_control_chassis' is already running. Exiting.${NC}"
+    exit 0
+fi
+
+# Start the node in the foreground and pass the brightness as a parameter
+if [ -n "$BRIGHTNESS" ]; then
     exec ros2 run led_control_chassis led_control_chassis_node --ros-args -p brightness:=$BRIGHTNESS
+else
+    exec ros2 run led_control_chassis led_control_chassis_node
 fi
