@@ -23,7 +23,13 @@ In the case of 1, you can try running the command with `DISPLAY=:0` to force it 
 DISPLAY=:0 ros2 run rqt_image_view rqt_image_view
 ```
 
-Or better, use something like a VNC server to connect to the Raspberry Pi's desktop environment and then start various ROS applications from there.
+Or better, use something like a VNC server to connect to the Raspberry Pi's desktop environment and then start various ROS applications from there. Alternatively, it is possible to forward X11 over SSH using:
+
+```bash
+ssh -X <user>@<raspberry_pi_ip>
+```
+
+In this case, it is important to have the Pi configured to allow X11 forwarding.
 
 In the case of 2, a key fix seems to be ensuring that the local X server is accepting connections from the Docker container. You can do this by running the following command on the host machine before starting the Docker container:
 
