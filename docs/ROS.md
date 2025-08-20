@@ -80,9 +80,12 @@ Examples:
     ros2 topic pub -1 /led_control/chassis vine_interfaces/msg/ChassisLed "{brightness: 50}"
     ```
 
+The Vine LED Control is protected such that certain brightnesses can only be run for certain durations, this is due to the risk of heat generation damaging the LED.
+
 There are also scripts to work with the LED control topics:
 
-- `[`start_]
+- `scripts/pub_led_chassis.sh` - publishes to `/led_control/chassis`
+- `scripts/pub_led_vine.sh` - publishes to `/led_control/vine`
 
 ### Pressure Control
 
