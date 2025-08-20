@@ -8,7 +8,6 @@ When working on a Raspberry Pi, ROS is installed in a docker container, the info
 
 Information on building, starting, and connecting to the docker container can be found [here](./Docker.md).
 
-
 ## 2. Workspace layout
 
 The colcon workspace is located at `vine_ws/` and follows a standard ROS 2 layout:
@@ -25,6 +24,13 @@ Key packages:
 - `vine_interfaces` — custom messages: `ChassisLed`, `VineLed`
 
 Additionally, there are other workspaces for other ROS nodes in `/pi_cam/` (for the Pi Camera nodes - sourced [here](https://github.com/MECH5080-Project-164/camera_ros)), in `/microros_ws/` (for the Micro-ROS agent - see the [Dockerfile](../docker/Dockerfile) for more information), and in `/pico_ws/` (in which the micro-ROS nodes are built).
+
+These workspaces are sourced automatically due to being included in the `.bashrc` of the root user of the docker container and so should be immediately usable, though it may still be important to know these exist.
+
+The key packages of these workspaces are:
+
+- `camera_ros` - provides the ROS 2 interface for the ArduCam camera modules.
+- `micro_ros_agent` - provides the Micro-ROS agent for communication with microcontrollers.
 
 ## 3. Build
 
@@ -50,10 +56,19 @@ Nodes can be started with `ros2 run`. Example:
 
     ros2 run led_control_chassis led_control_chassis_node
 
+A common order for launching nodes is:
+
+1. Start `micro_ros_agent` - enables sensor readings from the Pi Pico
+2. Start `gravity_pressure_sensor` - reads pressure data from the sensor and publishes it
+3. Start `led_control_chassis` - controls the chassis LED
+4. Start `led_control_vine` - controls the vine LED
+5. Start any other control nodes as needed such as `pressure_control`.
+
+There are also scripts to start these nodes in the `scripts/` directory.
 
 ## 5. Topics and message usage
 
-### LED control topics
+### LED Control topics
 
 - `/led_control/vine` — `vine_interfaces/msg/VineLed` (fields: `brightness`, `duration`, `force`)
 - `/led_control/chassis` — `vine_interfaces/msg/ChassisLed` (fields: `brightness`)
@@ -65,4 +80,26 @@ Examples:
     ros2 topic pub -1 /led_control/chassis vine_interfaces/msg/ChassisLed "{brightness: 50}"
     ```
 
+There are also scripts to work with the LED control topics:
+
+- `[`start_]
+
+### Pressure Control
+
+Pressure Control is mostly controlled through parameters. As such a slightly different workflow is used as there are no topics to publish to. The key parameters are:
+
+- `target_pressure` - the target pressure to maintain
+- `kp` - the proportional gain for the pressure controller
+- `ki` - the integral gain for the pressure controller
+- `kd` - the derivative gain for the pressure controller
+- `debug_force_pwm` - forces the PWM output to a specific value for debugging
+
+There are more parameters which can be found with the command:
+
+    ```bash
+    ros2 param list /pressure_control_node
+    ```
+
 ## 6. Helper scripts
+
+There are also helper scripts available in the [`scripts/`](../scripts/) directory to facilitate common tasks such as starting nodes and publishing messages.
