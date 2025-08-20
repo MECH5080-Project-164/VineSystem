@@ -86,14 +86,14 @@ if ! ros2 pkg list 2>/dev/null | grep -q led_control_vine 2>/dev/null; then
   exit 1
 fi
 
-# Prepare message fields
-# ros2 topic pub expects lower-case booleans true/false
-FORCE_STR="false"
-if [ "$FORCE" = true ]; then
-  FORCE_STR="true"
+echo -e "${GREEN}Starting vine LED node (brightness: ${BRIGHTNESS})${NC}"
+echo ""
+
+# If the node is already running, inform and exit — this script's job is to start the node
+if ros2 node list 2>/dev/null | grep -q "led_control_vine"; then
+  echo -e "${YELLOW}Node 'led_control_vine' is already running. Exiting.${NC}"
+  exit 0
 fi
 
-echo -e "${GREEN}Publishing VineLed -> brightness: ${BRIGHTNESS}, duration: ${DURATION}, force: ${FORCE_STR}${NC}"
-
-# Publish a single message to the led_control/vine topic
-exec ros2 topic pub /led_control/vine vine_interfaces/msg/VineLed "{brightness: $BRIGHTNESS, duration: $DURATION, force: $FORCE_STR}" -1
+# Start the node in the foreground; pass brightness and duration as parameters
+exec ros2 run led_control_vine led_control_vine_node --ros-args -p brightness:=$BRIGHTNESS -p duration:=$DURATION
