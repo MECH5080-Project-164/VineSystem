@@ -84,41 +84,55 @@ redraw_display() {
 # Hide cursor for a cleaner look
 tput civis
 
-# Find all temperature topics
-temp_topics=$(ros2 topic list | grep '/temperature')
+# Find all temperature topics using a bash array for safety
+mapfile -t temp_topics < <(ros2 topic list | grep '/temperature')
 
-if [ -z "$temp_topics" ]; then
+if [ ${#temp_topics[@]} -eq 0 ]; then
     echo -e "${COLOR_RED}No temperature topics found. Is the Pico running and publishing?${COLOR_RESET}"
     cleanup
 fi
 
-echo -e "${COLOR_GREEN}Found topics: ${temp_topics//$'\n'/, }${COLOR_RESET}"
+echo -e "${COLOR_GREEN}Found topics: $(IFS=, ; echo "${temp_topics[*]}")"${COLOR_RESET}
 echo "Starting monitor..."
 sleep 2
 
-# Subscribe to all found topics and process the data
-ros2 topic echo $temp_topics --no-daemon | while read -r line; do
-    if [[ $line == "---" ]]; then
-        # Identify the topic name from the line before the '---'
-        topic_name=$(echo "$prev_line" | tr -d ':')
-        sensor_name=$(echo "$topic_name" | awk -F'/' '{print $NF}')
-    elif [[ $line =~ "data:" ]]; then
-        # Extract temperature value
-        current_temp=$(echo "$line" | awk '{print $2}')
+# Main processing loop. It reads lines in the format "SensorName: data: value"
+# and updates the state, then redraws the screen.
+main_processor() {
+    local sensor_name data_keyword temp
+    while read -r sensor_name data_keyword temp; do
+        # Line is formatted as: "SensorName: data: 25.0"
+        # We need to remove the trailing colon from the sensor name
+        sensor_name=${sensor_name%:}
+
+        current_temps[$sensor_name]=$temp
         
-        # Update current temperature
-        current_temps[$sensor_name]=$current_temp
-        
-        # Update max temperature if needed
-        if [ -z "${max_temps[$sensor_name]}" ] || (( $(echo "$current_temp > ${max_temps[$sensor_name]}" | bc -l) )); then
-            max_temps[$sensor_name]=$current_temp
+        if [ -z "${max_temps[$sensor_name]}" ] || (( $(echo "$temp > ${max_temps[$sensor_name]}" | bc -l) )); then
+            max_temps[$sensor_name]=$temp
         fi
         
-        # Redraw the entire display with new data
         redraw_display
-    fi
-    prev_line=$line
-done
+    done
+}
+
+# This block runs a separate 'ros2 topic echo' for each topic in the background.
+# Each output is tagged with the sensor name and piped to the main processor.
+{
+    # Create a background process for each topic
+    for topic in "${temp_topics[@]}"; do
+        {
+            sensor_name=$(basename "$topic")
+            # Echo the topic and filter for data lines, prepending the sensor name
+            ros2 topic echo "$topic" --no-daemon | while read -r line; do
+                if [[ $line =~ "data:" ]]; then
+                    echo "$sensor_name: $line"
+                fi
+            done
+        } &
+    done
+    # Wait for all background processes to finish (which they won't, until Ctrl+C)
+    wait
+} | main_processor
 
 # Cleanup on natural exit (though unlikely with the loop)
 cleanup
