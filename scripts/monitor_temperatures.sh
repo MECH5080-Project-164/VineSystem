@@ -4,7 +4,7 @@
 # Displays a dashboard with current temperature, max temperature, and a visual bar.
 
 # --- Configuration ---
-WARN_TEMP=60.0
+WARN_TEMP=50.0
 MAX_DISPLAY_TEMP=80.0
 MIN_TEMP=20.0
 BAR_WIDTH=20
@@ -97,7 +97,7 @@ redraw_display() {
 
             local bar=$(draw_bar "$temp")
 
-            printf "${color}%-20s: %s %5.1f°C (Max: %5.1f°C)${COLOR_RESET}\n" "$display_name" "$bar" "$temp" "$max_temp"
+            printf "${color}%-20s: %s %5.1f°C (Max: %5.1f°C)${COLOR_RESET}$(tput el)\n" "$display_name" "$bar" "$temp" "$max_temp"
         done
     done
     echo "-----------------------------------------------------------------$(tput el)"
