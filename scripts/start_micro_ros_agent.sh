@@ -12,7 +12,7 @@ NC='\033[0m' # No Color
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FIND_PICO_SCRIPT="$SCRIPT_DIR/find_pico.sh"
+FIND_PICO_SCRIPT="$SCRIPT_DIR/tooling/find_pico.sh"
 
 show_help() {
     echo "Usage: $0 [OPTIONS]"

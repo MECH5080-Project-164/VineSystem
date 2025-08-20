@@ -20,7 +20,7 @@ Each Camera connected will require a dedicated node to publish its feed. The bes
 
 This takes the optional `camera_index` parameter which specifies which camera to publish the feed for. In general, with the Pi only having two CSI connectors, the indexes will be 0 and 1.
 
-There is a script to find the connected cameras and their indexes in [`find_pi_cameras.sh`](../scripts/find_pi_cameras.sh) which is best run from outside the Docker container.
+There is a script to find the connected cameras and their indexes in [`find_pi_cameras.sh`](../scripts/tooling/find_pi_cameras.sh) which is best run from outside the Docker container.
 
 If more fine-grained control is desired, use the [`start_pi_cam.sh`](../scripts/start_pi_cam.sh) script as a starting point and go from there.
 

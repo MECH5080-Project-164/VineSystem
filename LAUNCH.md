@@ -109,7 +109,7 @@ ros2 param set /pressure_control_node debug_force_pwm -1   # Disable debug mode
 
 ```bash
 # List available Pico devices
-./scripts/find_pico.sh --list
+./scripts/tooling/find_pico.sh --list
 
 # Start agent with auto-detection
 ./scripts/start_micro_ros_agent.sh
