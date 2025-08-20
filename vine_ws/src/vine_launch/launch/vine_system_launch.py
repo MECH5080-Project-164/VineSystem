@@ -12,24 +12,25 @@ Launches all nodes required for the vine robotic system including:
 
 import os
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, LogInfo, GroupAction, ExecuteProcess
+from launch.actions import DeclareLaunchArgument, LogInfo, GroupAction, ExecuteProcess, OpaqueFunction
 from launch.substitutions import LaunchConfiguration, TextSubstitution
+from launch.conditions import IfCondition, AndCondition
 from launch_ros.actions import Node
-from launch.conditions import IfCondition, UnlessCondition
+from ament_index_python.packages import get_package_share_directory
 
 
 def generate_launch_description():
     """Generate launch description for the complete vine system."""
-    
+
     # Environment setup - ensure all workspaces are sourced
     env_vars = os.environ.copy()
-    
+
     # Add workspace setup to environment if running from build
     workspace_path = '/home/workspace/students/VineSystem/vine_ws'
     if os.path.exists(f'{workspace_path}/install/setup.bash'):
         # Note: ROS launch will automatically source the install space
         pass
-    
+
     # Declare launch arguments for optional nodes
     launch_micro_ros_arg = DeclareLaunchArgument(
         'launch_micro_ros',
@@ -41,35 +42,52 @@ def generate_launch_description():
         default_value='true',
         description='Whether to launch the pressure sensor node'
     )
-    
+
     launch_cameras_arg = DeclareLaunchArgument(
         'launch_cameras',
         default_value='true',
         description='Whether to launch the camera nodes (Pi camera and USB endoscope)'
     )
-    
+
     launch_led_control_arg = DeclareLaunchArgument(
         'launch_led_control',
         default_value='true',
         description='Whether to launch the LED control nodes'
     )
-    
+
     launch_pressure_control_arg = DeclareLaunchArgument(
         'launch_pressure_control',
         default_value='true',
         description='Whether to launch the pressure control node'
     )
-    
+
+    # Endoscope parameter file and auto-configuration
+    default_endo_params = os.path.join(
+        get_package_share_directory('vine_launch'), 'resources', 'endo_cam_params.yaml'
+    )
+    endo_params_arg = DeclareLaunchArgument(
+        'endo_params_file',
+        default_value=default_endo_params,
+        description='Path to endoscope usb_cam parameter yaml'
+    )
+    auto_config_endoscope_arg = DeclareLaunchArgument(
+        'auto_config_endoscope',
+        default_value='true',
+        description='Whether to auto-detect endoscope device and modify param file'
+    )
+
     # Launch configuration variables
     launch_micro_ros = LaunchConfiguration('launch_micro_ros')
     launch_pressure_sensor = LaunchConfiguration('launch_pressure_sensor')
     launch_cameras = LaunchConfiguration('launch_cameras')
     launch_led_control = LaunchConfiguration('launch_led_control')
     launch_pressure_control = LaunchConfiguration('launch_pressure_control')
-    
+    endo_params_file = LaunchConfiguration('endo_params_file')
+    auto_config_endoscope = LaunchConfiguration('auto_config_endoscope')
+
     # Micro-ROS agent - FIRST to establish Pico communication
     micro_ros_agent = ExecuteProcess(
-        cmd=['bash', '-c', 
+        cmd=['bash', '-c',
              'source /ros_env_setup.sh && '
              'PICO_DEVICE=$(bash /home/workspace/students/VineSystem/scripts/find_pico.sh --first) && '
              'if [ -n "$PICO_DEVICE" ]; then '
@@ -81,7 +99,28 @@ def generate_launch_description():
         output='screen',
         condition=IfCondition(launch_micro_ros)
     )
-    
+
+    # Auto-configure endoscope device by running the helper script which
+    # modifies the provided params yaml (will create a backup). This runs
+    # only when cameras are being launched and auto-config is enabled.
+    configure_endoscope = ExecuteProcess(
+        cmd=[
+            'bash', '-c',
+            TextSubstitution(text='source /ros_env_setup.sh && bash /home/workspace/students/VineSystem/scripts/tooling/find_endoscope.sh -m -y -p ') ,
+            endo_params_file
+        ],
+        output='screen',
+        condition=AndCondition(IfCondition(launch_cameras), IfCondition(auto_config_endoscope))
+    )
+
+    def _validate_params_file(context, *args, **kwargs):
+        path = endo_params_file.perform(context)
+        if not os.path.exists(path):
+            print(f"[vine_launch] WARNING: endoscope params file not found: {path}")
+        return []
+
+    params_file_check = OpaqueFunction(function=_validate_params_file)
+
     # Pressure sensor node
     pressure_sensor_node = Node(
         package='gravity_pressure_sensor',
@@ -98,7 +137,7 @@ def generate_launch_description():
         # Ensure workspace is sourced
         additional_env={'ROS_DOMAIN_ID': '0'}
     )
-    
+
     # Camera nodes group
     camera_group = GroupAction([
         Node(
@@ -118,15 +157,10 @@ def generate_launch_description():
             package='usb_cam',
             executable='usb_cam_node_exe',
             name='endoscope_camera',
-            parameters=[{
-                'video_device': '/dev/video0',
-                'image_width': 640,
-                'image_height': 480,
-                'pixel_format': 'mjpeg',
-                'framerate': 30.0,
-                'camera_name': 'endoscope',
-                'camera_info_url': '',
-            }],
+            # Load parameters from the endoscope params yaml. This file may
+            # be modified by `scripts/tooling/find_endoscope.sh` to set the
+            # correct `video_device` before the node starts.
+            parameters=[endo_params_file],
             output='screen',
             remappings=[
                 ('image_raw', '/vine_system/endoscope/image_raw'),
@@ -134,7 +168,7 @@ def generate_launch_description():
             ]
         ),
     ], condition=IfCondition(launch_cameras))
-    
+
     # LED control nodes group
     led_control_group = GroupAction([
         Node(
@@ -156,7 +190,7 @@ def generate_launch_description():
             ]
         ),
     ], condition=IfCondition(launch_led_control))
-    
+
     # Pressure control node
     pressure_control_node = Node(
         package='pressure_control',
@@ -174,7 +208,7 @@ def generate_launch_description():
         ],
         condition=IfCondition(launch_pressure_control)
     )
-    
+
     # System startup message
     startup_message = LogInfo(
         msg=[
@@ -188,7 +222,7 @@ def generate_launch_description():
             'All nodes will publish to /vine_system/ namespace for organized topics.'
         ]
     )
-    
+
     return LaunchDescription([
         # Launch arguments
         launch_micro_ros_arg,
@@ -196,13 +230,17 @@ def generate_launch_description():
         launch_cameras_arg,
         launch_led_control_arg,
         launch_pressure_control_arg,
-        
+        endo_params_arg,
+        auto_config_endoscope_arg,
+
         # Startup message
         startup_message,
-        
+
         # Nodes (micro-ROS agent FIRST)
         micro_ros_agent,
         pressure_sensor_node,
+        params_file_check,
+        configure_endoscope,
         camera_group,
         led_control_group,
         pressure_control_node,
