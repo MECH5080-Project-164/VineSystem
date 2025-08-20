@@ -16,7 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssl \
     i2c-tools \
     v4l-utils \
-    build-essential
+    build-essential \
+    bc
 
 # Install development libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
