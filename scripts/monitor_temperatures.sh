@@ -102,6 +102,9 @@ redraw_display() {
     done
     echo "-----------------------------------------------------------------"
     echo -e "Last update: $(date)"
+    
+    # Clear from the cursor to the end of the screen to remove old artifacts
+    tput ed
 }
 
 # --- Main Logic ---
@@ -109,15 +112,24 @@ redraw_display() {
 # Hide cursor for a cleaner look
 tput civis
 
-# Find all temperature topics using a bash array for safety
-mapfile -t temp_topics < <(ros2 topic list | grep '/temperature')
+# Find all temperature topics and their types
+mapfile -t topic_info < <(ros2 topic list -t | grep '/temperature')
 
-if [ ${#temp_topics[@]} -eq 0 ]; then
+if [ ${#topic_info[@]} -eq 0 ]; then
     echo -e "${COLOR_RED}No temperature topics found. Is the Pico running and publishing?${COLOR_RESET}"
     cleanup
 fi
 
-echo -e "${COLOR_GREEN}Found topics: $(IFS=, ; echo "${temp_topics[*]}")"${COLOR_RESET}
+# Declare an associative array to store topic names and their types
+declare -A topics_and_types
+for info in "${topic_info[@]}"; do
+    # Extract topic name and type
+    topic_name=$(echo "$info" | awk '{print $1}')
+    topic_type=$(echo "$info" | awk '{print $2}' | tr -d '[]')
+    topics_and_types["$topic_name"]=$topic_type
+done
+
+echo -e "${COLOR_GREEN}Found topics: $(IFS=, ; echo "${!topics_and_types[*]}")"${COLOR_RESET}
 echo "Starting monitor..."
 sleep 2
 
@@ -144,14 +156,15 @@ main_processor() {
 # Each output is tagged with a unique key and piped to the main processor.
 {
     # Create a background process for each topic
-    for topic in "${temp_topics[@]}"; do
+    for topic in "${!topics_and_types[@]}"; do
         {
             # The unique key is the topic path after /temperature/
             # e.g., /temperature/PumpChassis/AmbientAir -> PumpChassis/AmbientAir
             unique_key=${topic#"/temperature/"}
+            topic_type=${topics_and_types[$topic]}
             
-            # Echo the topic and filter for data lines, prepending the unique key
-            ros2 topic echo "$topic" --no-daemon | while read -r line; do
+            # Echo the topic with its type and filter for data lines, prepending the unique key
+            ros2 topic echo "$topic" "$topic_type" --no-daemon | while read -r line; do
                 if [[ $line =~ "data:" ]]; then
                     echo "$unique_key: $line"
                 fi
