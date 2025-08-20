@@ -133,34 +133,19 @@ echo -e "${COLOR_GREEN}Found topics: $(IFS=, ; echo "${!topics_and_types[*]}")"$
 echo "Starting monitor..."
 sleep 2
 
-# Data processing function - runs in the background
-process_data_pipe() {
-    local unique_key data_keyword temp
-    while read -r unique_key data_keyword temp; do
-        # Line is formatted as: "PumpChassis/AmbientAir: data: 25.0"
-        # We need to remove the trailing colon from the unique key
-        unique_key=${unique_key%:}
+# Track when we last updated the display to prevent flicker
+last_display_update=0
 
-        current_temps[$unique_key]=$temp
-        
-        if [ -z "${max_temps[$unique_key]}" ] || (( $(echo "$temp > ${max_temps[$unique_key]}" | bc -l) )); then
-            max_temps[$unique_key]=$temp
-        fi
-    done
-}
-
-# This block runs a separate 'ros2 topic echo' for each topic in the background.
-# The entire output is piped to the data processor.
+# Main processing loop that reads data and updates display with throttling
 {
     for topic in "${!topics_and_types[@]}"; do
         {
             # The unique key is the topic path after /temperature/
-            # e.g., /temperature/PumpChassis/AmbientAir -> PumpChassis/AmbientAir
             unique_key=${topic#"/temperature/"}
             topic_type=${topics_and_types[$topic]}
             
             # Echo the topic with its type and filter for data lines, prepending the unique key
-            ros2 topic echo "$topic" "$topic_type" --no-daemon | while read -r line; do
+            ros2 topic echo "$topic" "$topic_type" --no-daemon 2>/dev/null | while read -r line; do
                 if [[ $line =~ "data:" ]]; then
                     echo "$unique_key: $line"
                 fi
@@ -168,12 +153,23 @@ process_data_pipe() {
         } &
     done
     wait
-} | process_data_pipe & # Run the data processing in the background
+} | while read -r unique_key data_keyword temp; do
+    # Line is formatted as: "PumpChassis/AmbientAir: data: 25.0"
+    # Remove the trailing colon from the unique key
+    unique_key=${unique_key%:}
 
-# Foreground loop for redrawing the screen at a fixed rate
-while true; do
-    redraw_display
-    sleep 0.1 # 10Hz refresh rate
+    current_temps[$unique_key]=$temp
+    
+    if [ -z "${max_temps[$unique_key]}" ] || (( $(echo "$temp > ${max_temps[$unique_key]}" | bc -l) )); then
+        max_temps[$unique_key]=$temp
+    fi
+    
+    # Throttle display updates to prevent flicker (update max every 0.1 seconds)
+    current_time=$(date +%s%N | cut -b1-13)  # milliseconds
+    if (( current_time - last_display_update > 100 )); then
+        redraw_display
+        last_display_update=$current_time
+    fi
 done
 
 # Cleanup on natural exit (though unlikely with the loop)
