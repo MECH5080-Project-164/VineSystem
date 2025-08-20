@@ -61,8 +61,8 @@ redraw_display() {
     # Move cursor to top-left corner instead of clearing the screen
     tput cup 0 0
     
-    echo -e "${COLOR_YELLOW}--- Pico Temperature Monitor --- (Press Ctrl+C to exit)${COLOR_RESET}"
-    echo -e "Bar Range: ${MIN_TEMP}°C to ${MAX_DISPLAY_TEMP}°C | Warning: >${WARN_TEMP}°C"
+    echo -e "${COLOR_YELLOW}--- Pico Temperature Monitor --- (Press Ctrl+C to exit)${COLOR_RESET}$(tput el)"
+    echo -e "Bar Range: ${MIN_TEMP}°C to ${MAX_DISPLAY_TEMP}°C | Warning: >${WARN_TEMP}°C$(tput el)"
     
     # Group sensors by their parent directory (e.g., PumpChassis)
     declare -A grouped_sensors
@@ -77,8 +77,8 @@ redraw_display() {
 
     # Loop through sorted groups and display their data
     for group in "${sorted_groups[@]}"; do
-        echo "-----------------------------------------------------------------"
-        echo -e "${COLOR_YELLOW}Sensor Group: $group${COLOR_RESET}"
+        echo "-----------------------------------------------------------------$(tput el)"
+        echo -e "${COLOR_YELLOW}Sensor Group: $group${COLOR_RESET}$(tput el)"
         
         # Read keys into an array and sort them
         read -r -a group_keys <<< "${grouped_sensors[$group]}"
@@ -100,8 +100,8 @@ redraw_display() {
             printf "${color}%-20s: %s %5.1f°C (Max: %5.1f°C)${COLOR_RESET}\n" "$display_name" "$bar" "$temp" "$max_temp"
         done
     done
-    echo "-----------------------------------------------------------------"
-    echo -e "Last update: $(date)"
+    echo "-----------------------------------------------------------------$(tput el)"
+    echo -e "Last update: $(date)$(tput el)"
     
     # Clear from the cursor to the end of the screen to remove old artifacts
     tput ed
@@ -133,9 +133,8 @@ echo -e "${COLOR_GREEN}Found topics: $(IFS=, ; echo "${!topics_and_types[*]}")"$
 echo "Starting monitor..."
 sleep 2
 
-# Main processing loop. It reads lines in the format "SensorName: data: value"
-# and updates the state, then redraws the screen.
-main_processor() {
+# Data processing function - runs in the background
+process_data_pipe() {
     local unique_key data_keyword temp
     while read -r unique_key data_keyword temp; do
         # Line is formatted as: "PumpChassis/AmbientAir: data: 25.0"
@@ -147,15 +146,12 @@ main_processor() {
         if [ -z "${max_temps[$unique_key]}" ] || (( $(echo "$temp > ${max_temps[$unique_key]}" | bc -l) )); then
             max_temps[$unique_key]=$temp
         fi
-        
-        redraw_display
     done
 }
 
 # This block runs a separate 'ros2 topic echo' for each topic in the background.
-# Each output is tagged with a unique key and piped to the main processor.
+# The entire output is piped to the data processor.
 {
-    # Create a background process for each topic
     for topic in "${!topics_and_types[@]}"; do
         {
             # The unique key is the topic path after /temperature/
@@ -171,9 +167,14 @@ main_processor() {
             done
         } &
     done
-    # Wait for all background processes to finish (which they won't, until Ctrl+C)
     wait
-} | main_processor
+} | process_data_pipe & # Run the data processing in the background
+
+# Foreground loop for redrawing the screen at a fixed rate
+while true; do
+    redraw_display
+    sleep 0.1 # 10Hz refresh rate
+done
 
 # Cleanup on natural exit (though unlikely with the loop)
 cleanup
