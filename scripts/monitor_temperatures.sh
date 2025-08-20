@@ -4,7 +4,8 @@
 # Displays a dashboard with current temperature, max temperature, and a visual bar.
 
 # --- Configuration ---
-WARN_TEMP=40.0
+WARN_TEMP=60.0
+MAX_DISPLAY_TEMP=80.0
 MIN_TEMP=20.0
 BAR_WIDTH=20
 
@@ -36,8 +37,8 @@ draw_bar() {
     local temp=$1
     local bar_percentage
     
-    # Calculate the percentage of the bar to fill
-    bar_percentage=$(echo "scale=4; ($temp - $MIN_TEMP) / ($WARN_TEMP - $MIN_TEMP)" | bc)
+    # Calculate the percentage of the bar to fill, now spanning from MIN_TEMP to MAX_DISPLAY_TEMP
+    bar_percentage=$(echo "scale=4; ($temp - $MIN_TEMP) / ($MAX_DISPLAY_TEMP - $MIN_TEMP)" | bc)
 
     # Clamp percentage between 0 and 1
     if (( $(echo "$bar_percentage < 0" | bc -l) )); then bar_percentage=0; fi
@@ -57,23 +58,47 @@ draw_bar() {
 
 # Main display function
 redraw_display() {
-    tput clear # Clear the terminal
-    echo -e "${COLOR_YELLOW}--- Pico Temperature Monitor --- (Press Ctrl+C to exit)${COLOR_RESET}"
-    echo "-----------------------------------------------------------------"
+    # Move cursor to top-left corner instead of clearing the screen
+    tput cup 0 0
     
-    # Loop through all known sensors and display their data
-    for sensor in "${!current_temps[@]}"; do
-        local temp=${current_temps[$sensor]}
-        local max_temp=${max_temps[$sensor]}
+    echo -e "${COLOR_YELLOW}--- Pico Temperature Monitor --- (Press Ctrl+C to exit)${COLOR_RESET}"
+    echo -e "Bar Range: ${MIN_TEMP}°C to ${MAX_DISPLAY_TEMP}°C | Warning: >${WARN_TEMP}°C"
+    
+    # Group sensors by their parent directory (e.g., PumpChassis)
+    declare -A grouped_sensors
+    for key in "${!current_temps[@]}"; do
+        group=$(dirname "$key")
+        # Use a simple space-separated list of keys for each group
+        grouped_sensors["$group"]+="$key "
+    done
+
+    # Get sorted group names
+    sorted_groups=($(for group in "${!grouped_sensors[@]}"; do echo "$group"; done | sort))
+
+    # Loop through sorted groups and display their data
+    for group in "${sorted_groups[@]}"; do
+        echo "-----------------------------------------------------------------"
+        echo -e "${COLOR_YELLOW}Sensor Group: $group${COLOR_RESET}"
         
-        local color=$COLOR_GREEN
-        if (( $(echo "$temp >= $WARN_TEMP" | bc -l) )); then
-            color=$COLOR_RED
-        fi
+        # Read keys into an array and sort them
+        read -r -a group_keys <<< "${grouped_sensors[$group]}"
+        sorted_keys=($(for key in "${group_keys[@]}"; do echo "$key"; done | sort))
 
-        local bar=$(draw_bar "$temp")
+        for key in "${sorted_keys[@]}"; do
+            local temp=${current_temps[$key]}
+            local max_temp=${max_temps[$key]}
+            # The display name is the final part of the key (e.g., AmbientAir)
+            local display_name=$(basename "$key")
+            
+            local color=$COLOR_GREEN
+            if (( $(echo "$temp >= $WARN_TEMP" | bc -l) )); then
+                color=$COLOR_RED
+            fi
 
-        printf "${color}%-20s: %s %5.1f°C (Max: %5.1f°C)${COLOR_RESET}\n" "$sensor" "$bar" "$temp" "$max_temp"
+            local bar=$(draw_bar "$temp")
+
+            printf "${color}%-20s: %s %5.1f°C (Max: %5.1f°C)${COLOR_RESET}\n" "$display_name" "$bar" "$temp" "$max_temp"
+        done
     done
     echo "-----------------------------------------------------------------"
     echo -e "Last update: $(date)"
@@ -99,16 +124,16 @@ sleep 2
 # Main processing loop. It reads lines in the format "SensorName: data: value"
 # and updates the state, then redraws the screen.
 main_processor() {
-    local sensor_name data_keyword temp
-    while read -r sensor_name data_keyword temp; do
-        # Line is formatted as: "SensorName: data: 25.0"
-        # We need to remove the trailing colon from the sensor name
-        sensor_name=${sensor_name%:}
+    local unique_key data_keyword temp
+    while read -r unique_key data_keyword temp; do
+        # Line is formatted as: "PumpChassis/AmbientAir: data: 25.0"
+        # We need to remove the trailing colon from the unique key
+        unique_key=${unique_key%:}
 
-        current_temps[$sensor_name]=$temp
+        current_temps[$unique_key]=$temp
         
-        if [ -z "${max_temps[$sensor_name]}" ] || (( $(echo "$temp > ${max_temps[$sensor_name]}" | bc -l) )); then
-            max_temps[$sensor_name]=$temp
+        if [ -z "${max_temps[$unique_key]}" ] || (( $(echo "$temp > ${max_temps[$unique_key]}" | bc -l) )); then
+            max_temps[$unique_key]=$temp
         fi
         
         redraw_display
@@ -116,16 +141,19 @@ main_processor() {
 }
 
 # This block runs a separate 'ros2 topic echo' for each topic in the background.
-# Each output is tagged with the sensor name and piped to the main processor.
+# Each output is tagged with a unique key and piped to the main processor.
 {
     # Create a background process for each topic
     for topic in "${temp_topics[@]}"; do
         {
-            sensor_name=$(basename "$topic")
-            # Echo the topic and filter for data lines, prepending the sensor name
+            # The unique key is the topic path after /temperature/
+            # e.g., /temperature/PumpChassis/AmbientAir -> PumpChassis/AmbientAir
+            unique_key=${topic#"/temperature/"}
+            
+            # Echo the topic and filter for data lines, prepending the unique key
             ros2 topic echo "$topic" --no-daemon | while read -r line; do
                 if [[ $line =~ "data:" ]]; then
-                    echo "$sensor_name: $line"
+                    echo "$unique_key: $line"
                 fi
             done
         } &
