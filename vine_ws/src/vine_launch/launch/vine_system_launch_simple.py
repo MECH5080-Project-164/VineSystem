@@ -12,9 +12,9 @@ Launches all nodes required for the vine robotic system including:
 
 import os
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess, LogInfo
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, LogInfo, Node
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 
 def generate_launch_description():
     """Generate launch description for the complete vine system."""
@@ -34,42 +34,74 @@ def generate_launch_description():
         default_value='true',
         description='Whether to launch the micro-ROS agent for Pico communication'
     )
+    launch_pressure_sensor_arg = DeclareLaunchArgument(
+        'launch_pressure_sensor',
+        default_value='true',
+        description='Whether to launch the pressure sensor node'
+    )
 
     # Launch configuration variables
     launch_micro_ros = LaunchConfiguration('launch_micro_ros')
+    launch_pressure_sensor = LaunchConfiguration('launch_pressure_sensor')
 
     # Micro-ROS agent - FIRST to establish Pico communication
+    # Micro-ROS agent launcher script now lives in scripts/tooling
     micro_ros_agent = ExecuteProcess(
         cmd=['bash', '-c',
-             'source /ros_env_setup.sh && '
-             'PICO_DEVICE=$(bash /home/workspace/students/VineSystem/scripts/find_pico.sh --first) && '
+             'set -e; '
+             'source /ros_env_setup.sh || true; '
+             'FIND_PICO_SCRIPT="/home/workspace/students/VineSystem/scripts/tooling/find_pico.sh"; '
+             'if [ ! -x "$FIND_PICO_SCRIPT" ]; then '
+             '  echo "[micro_ros_agent] Pico finder script not found at $FIND_PICO_SCRIPT; skipping micro-ROS agent."; '
+             '  exit 0; '
+             'fi; '
+             'PICO_DEVICE=$($FIND_PICO_SCRIPT --first || true); '
              'if [ -n "$PICO_DEVICE" ]; then '
-             'echo "Starting micro_ros_agent on $PICO_DEVICE" && '
-             'ros2 run micro_ros_agent micro_ros_agent serial --dev $PICO_DEVICE; '
+             '  echo "[micro_ros_agent] Starting micro_ros_agent on $PICO_DEVICE"; '
+             '  exec ros2 run micro_ros_agent micro_ros_agent serial --dev $PICO_DEVICE; '
              'else '
-             'echo "No Pico device found, micro_ros_agent not started"; '
-             'fi'],
+             '  echo "[micro_ros_agent] No Pico device found; agent not started."; '
+             'fi' ],
         output='screen',
         condition=IfCondition(launch_micro_ros)
+    )
+
+    # Pressure sensor node
+    pressure_sensor_node = Node(
+        package='gravity_pressure_sensor',
+        executable='pressure_reading_node',
+        name='pressure_sensor_node',
+        parameters=[{
+            'i2c_bus': 1,
+            'i2c_address': 0x16,
+            'publish_rate_hz': 50.0,
+            'mean_sample_size': 1
+        }],
+        output='screen',
+        condition=IfCondition(launch_pressure_sensor),
+        # Ensure workspace is sourced
+        additional_env={'ROS_DOMAIN_ID': '0'}
     )
 
     # System startup message
     startup_message = LogInfo(
         msg=[
-            'Starting Vine System with the following configuration:\n',
-            '  - Micro-ROS Agent: ', launch_micro_ros, '\n',
-            'Micro-ROS agent will start first to establish Pico communication.\n',
-            'All nodes will publish to /vine_system/ namespace for organized topics.'
+            'Vine System launch configuration:\n',
+            '  - Micro-ROS Agent requested: ', launch_micro_ros, '\n',
+            '  - Pressure Sensor requested: ', launch_pressure_sensor, '\n',
+            'Will attempt to locate Pico via scripts/tooling/find_pico.sh before starting agent.'
         ]
     )
 
     return LaunchDescription([
         # Launch arguments
         launch_micro_ros_arg,
+        launch_pressure_sensor_arg,
 
         # Startup message
         startup_message,
 
         # Nodes (micro-ROS agent FIRST)
         micro_ros_agent,
+        pressure_sensor_node
     ])
