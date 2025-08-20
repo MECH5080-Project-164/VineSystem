@@ -11,12 +11,9 @@ Launches all nodes required for the vine robotic system including:
 """
 
 import os
-from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, LogInfo, GroupAction, ExecuteProcess, OpaqueFunction
-from launch.substitutions import LaunchConfiguration, TextSubstitution
-from launch.conditions import IfCondition, AndCondition
-from launch_ros.actions import Node
-from ament_index_python.packages import get_package_share_directory
+from launch import LaunchConfiguration, LaunchDescription
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, LogInfo
+from launch.conditions import IfCondition
 
 
 def generate_launch_description():
