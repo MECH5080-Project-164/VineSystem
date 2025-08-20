@@ -6,6 +6,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/float32.hpp>
 #include <std_msgs/msg/int32.hpp>
+#include <std_msgs/msg/bool.hpp>
 #include <rcl_interfaces/msg/parameter_descriptor.hpp>
 #include <rcl_interfaces/msg/set_parameters_result.hpp>
 
@@ -51,6 +52,10 @@ public:
     debug_force_pwm_desc.description = "Debug: Force PWM to always output this value (set to -1 to disable)";
     this->declare_parameter<int>("debug_force_pwm", -1, debug_force_pwm_desc);
 
+  auto pump_enabled_desc = rcl_interfaces::msg::ParameterDescriptor();
+  pump_enabled_desc.description = "Enable or disable pump control (can be overridden by /pump/enable topic)";
+  this->declare_parameter<bool>("pump_enabled", false, pump_enabled_desc);
+
     // Initialise variables
     current_pressure_ = 0.0;
     target_pressure_ = this->get_parameter("target_pressure").as_double();
@@ -60,7 +65,8 @@ public:
     max_integral_ = this->get_parameter("max_integral").as_double();
     max_pwm_ = this->get_parameter("max_pwm").as_int();
     min_pwm_ = this->get_parameter("min_pwm").as_int();
-    debug_force_pwm_ = this->get_parameter("debug_force_pwm").as_int();
+  debug_force_pwm_ = this->get_parameter("debug_force_pwm").as_int();
+  pump_enabled_ = this->get_parameter("pump_enabled").as_bool();
 
     pressure_received_ = false;
     integral_error_ = 0.0;
@@ -84,6 +90,10 @@ public:
     parameter_callback_handle_ = this->add_on_set_parameters_callback(
       std::bind(&PressureControlNode::parameter_callback, this, std::placeholders::_1));
 
+    // Subscriber: single source-of-truth for pump enable/disable
+    pump_enable_subscriber_ = this->create_subscription<std_msgs::msg::Bool>(
+      "/pump/enable", 10, std::bind(&PressureControlNode::pump_enable_callback, this, std::placeholders::_1));
+
     RCLCPP_INFO(this->get_logger(), "=== Pressure Control Node Initialized ===");
     RCLCPP_INFO(this->get_logger(), "Target pressure: %.2f kPa", target_pressure_);
     RCLCPP_INFO(this->get_logger(), "Proportional gain (Kp): %.3f", kp_);
@@ -95,6 +105,7 @@ public:
     if (debug_force_pwm_ >= 0) {
       RCLCPP_WARN(this->get_logger(), "DEBUG MODE: Forcing PWM to %d", debug_force_pwm_);
     }
+  RCLCPP_INFO(this->get_logger(), "Pump enabled: %s", pump_enabled_ ? "true" : "false");
     RCLCPP_INFO(this->get_logger(), "Subscribed to: pressure");
     RCLCPP_INFO(this->get_logger(), "Publishing to: pump_pwm_control");
     RCLCPP_INFO(this->get_logger(), "========================================");
@@ -107,7 +118,29 @@ private:
     RCLCPP_DEBUG(this->get_logger(), "Pressure: %.2f kPa", current_pressure_);
   }
 
+  void pump_enable_callback(const std_msgs::msg::Bool::SharedPtr msg) {
+    bool new_state = msg->data;
+    if (new_state != pump_enabled_) {
+      pump_enabled_ = new_state;
+      RCLCPP_INFO(this->get_logger(), "/pump/enable topic changed pump_enabled to: %s", pump_enabled_ ? "true" : "false");
+      if (!pump_enabled_) {
+        // when disabled, reset internal controller state and ensure pump is stopped
+        integral_error_ = 0.0;
+        previous_error_ = 0.0;
+        auto pwm_msg = std_msgs::msg::Int32();
+        pwm_msg.data = 0;
+        pwm_publisher_->publish(pwm_msg);
+      }
+    }
+  }
+
   void control_loop() {
+    // Respect global pump enabled flag (single source of truth)
+    if (!pump_enabled_) {
+      RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+        "Pump control is disabled by /pump/enable (skipping PID and PWM publishing)");
+      return;
+    }
     // Check if we've received any pressure data
     if (!pressure_received_) {
       RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
@@ -256,6 +289,22 @@ private:
           RCLCPP_INFO(this->get_logger(), "DEBUG MODE DISABLED: Normal PID control resumed");
         }
       }
+      else if (param.get_name() == "pump_enabled") {
+        bool new_state = param.as_bool();
+        if (new_state != pump_enabled_) {
+          pump_enabled_ = new_state;
+          RCLCPP_INFO(this->get_logger(), "pump_enabled parameter set to: %s", pump_enabled_ ? "true" : "false");
+          if (!pump_enabled_) {
+            // Reset control state when disabling pump
+            integral_error_ = 0.0;
+            previous_error_ = 0.0;
+            // Publish zero PWM to ensure pump is off
+            auto pwm_msg = std_msgs::msg::Int32();
+            pwm_msg.data = 0;
+            pwm_publisher_->publish(pwm_msg);
+          }
+        }
+      }
       else if (param.get_name() == "control_frequency") {
         double new_freq = param.as_double();
         if (new_freq <= 0.0) {
@@ -277,6 +326,7 @@ private:
 
   // Member variables
   rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr pressure_subscription_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr pump_enable_subscriber_;
   rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr pwm_publisher_;
   rclcpp::TimerBase::SharedPtr control_timer_;
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr parameter_callback_handle_;
@@ -291,6 +341,7 @@ private:
 
   // Control state variables
   bool pressure_received_;
+  bool pump_enabled_;
   double integral_error_;
   double previous_error_;
   rclcpp::Time last_time_;

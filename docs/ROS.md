@@ -97,6 +97,33 @@ Pressure Control is mostly controlled through parameters. As such a slightly dif
 - `kd` - the derivative gain for the pressure controller
 - `debug_force_pwm` - forces the PWM output to a specific value for debugging
 
+Pump enable/disable
+
+-- `pump_enabled` - (bool) global default that enables or disables pump control. Default: `false`.
+
+There is also a runtime single source-of-truth topic for enabling/disabling the pump:
+
+- `/pump/enable` — `std_msgs/msg/Bool` — publishing `true` or `false` immediately enables or disables pump control across the node.
+
+Behavior:
+
+- If `/pump/enable` publishes `false`, the pressure controller will immediately stop publishing PWM, reset integral/derivative state, and throttle status messages while disabled.
+- The node still exposes the `pump_enabled` parameter. Setting the parameter updates the node state in the same way; however, publishing to `/pump/enable` acts as the live authoritative command source for runtime control.
+
+Examples:
+
+    ```bash
+    # Disable pump at runtime (single publish)
+    ros2 topic pub -1 /pump/enable std_msgs/msg/Bool "{data: false}"
+
+    # Re-enable pump
+    ros2 topic pub -1 /pump/enable std_msgs/msg/Bool "{data: true}"
+
+    # Or set the parameter directly (persistent until changed)
+    ros2 param set /pressure_control_node pump_enabled false
+    ros2 param set /pressure_control_node pump_enabled true
+    ```
+
 There are more parameters which can be found with the command:
 
     ```bash
