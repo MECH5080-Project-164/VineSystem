@@ -66,6 +66,10 @@ Navigate to `Interface Options` -> `Serial Port` and disable the login shell ove
 
 We prefer to communicate over the primary UART which defaults to GPIO 14 (TX) and GPIO 15 (RX).
 
+### U2D2 udev Rule
+
+Testing revealed that the U2D2 would often change its device path even while it was being used. To mitigate this, a udev rule was implemented to symlink the U2D2 device to a consistent path.
+
 ## Docker
 
 The Docker container is built using the Dockerfile located in the `docker_config` directory. The container is based on the official ROS 2 Jazzy image and includes packages for using Pi Cameras and WiringPi GPIO tools. The container is built using the following command:
