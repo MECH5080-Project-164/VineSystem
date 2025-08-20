@@ -20,6 +20,7 @@ show_help() {
     echo "  -m, --modify      Modify the parameter yaml file"
     echo "  -p, --param FILE  Specify the parameter yaml file (default: $PARAMETER_FILE)"
     echo "  -d, --device PATH Specify the device path (default: $DEFAULT_MOUNT_POINT)"
+    echo "  -y, --yes         Assume yes to confirmation prompt when modifying"
     echo
 }
 
@@ -109,6 +110,10 @@ user_confirmation() {
     echo "-----------------------------------------"
     echo ""
     echo "About to modify parameter file $PARAMETER_FILE with device path $DEVICE_PATH"
+    if [ "$FORCE_YES" = true ]; then
+        echo "Force yes enabled; skipping prompt."
+        return 0
+    fi
     while true; do
         read -r -p "Are you sure you want to continue? (Y/n): " REPLY
         case $REPLY in
@@ -121,6 +126,7 @@ user_confirmation() {
 
 # --- Arguments ---
 MODIFY=false
+FORCE_YES=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -139,6 +145,10 @@ while [[ $# -gt 0 ]]; do
         -d|--device)
             DEVICE_PATH="$2"
             shift 2
+            ;;
+        -y|--yes)
+            FORCE_YES=true
+            shift
             ;;
         *)
             echo "Unknown option: $1" >&2
