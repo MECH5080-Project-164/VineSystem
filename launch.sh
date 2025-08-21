@@ -209,7 +209,7 @@ if $AUTO_CONFIG_ENDO; then
         ARGS='-m'
         $ASSUME_YES && ARGS+=" -y"
         [[ -f "$ENDO_PARAMS" ]] && ARGS+=" -p $ENDO_PARAMS"
-        bash "$FIND_ENDO_SCRIPT" $ARGS || echo '[endoscope] finder script failed'
+    bash "$FIND_ENDO_SCRIPT" ${ARGS:-} || echo '[endoscope] finder script failed'
     else
         echo '[endoscope] finder script not executable: $FIND_ENDO_SCRIPT'
     fi
