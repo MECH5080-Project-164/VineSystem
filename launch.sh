@@ -361,6 +361,9 @@ create_led_window
 # Window 4 (Cameras)
 create_camera_window
 
+# Switch to core window
+tmux select-window -t "$SESSION_NAME:core"
+
 info "Created tmux session '$SESSION_NAME'."
 
 if $ATTACH_AUTO && [[ -t 1 ]]; then
