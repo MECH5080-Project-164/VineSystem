@@ -39,6 +39,11 @@ CONTAINER_WORKSPACE="/home/workspace"
 OVERLAY_SETUP_REL="$CONTAINER_WORKSPACE/students/VineSystem/vine_ws/install/setup.bash"
 SOURCE_OVERLAY=true
 
+# Path to helper function file (host & container view share path under mounted workspace)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOST_FN_FILE="$SCRIPT_DIR/scripts/exit_vine_fn.sh"
+CONTAINER_FN_FILE="$CONTAINER_WORKSPACE/students/VineSystem/scripts/exit_vine_fn.sh"
+
 # Derived paths inside container (avoid stale hard-coded host paths)
 FIND_ENDO_SCRIPT="$CONTAINER_WORKSPACE/students/VineSystem/scripts/tooling/find_endoscope.sh"
 FIND_PICO_SCRIPT="$CONTAINER_WORKSPACE/students/VineSystem/scripts/tooling/find_pico.sh"
@@ -171,6 +176,8 @@ if $SOURCE_OVERLAY; then
 else
     ENV_PREFIX='source /ros_env_setup.sh 2>/dev/null || true; '
 fi
+# Always try to source exit_vine helper inside container panes
+ENV_PREFIX+="[ -f $CONTAINER_FN_FILE ] && source $CONTAINER_FN_FILE; "
 run_in_container() {
     local cmd="$1"
     # Always cd into workspace so relative paths (like ENDO_PARAMS) are valid
@@ -179,7 +186,15 @@ run_in_container() {
 
 
 create_session() {
-    tmux new-session -d -s "$SESSION_NAME" -n core "bash -lc 'echo Hello from vine core; exec bash'"
+    local core_cmd
+    if [[ -f "$HOST_FN_FILE" ]]; then
+        core_cmd="bash -lc 'source $HOST_FN_FILE 2>/dev/null || true; echo Hello from vine core; export SESSION_NAME=$SESSION_NAME CONTAINER_NAME=$CONTAINER_NAME; exec bash'"
+    else
+        core_cmd="bash -lc 'echo Hello from vine core; export SESSION_NAME=$SESSION_NAME CONTAINER_NAME=$CONTAINER_NAME; exec bash'"
+    fi
+    tmux new-session -d -s "$SESSION_NAME" -n core "$core_cmd"
+    tmux set-environment -t "$SESSION_NAME" SESSION_NAME "$SESSION_NAME"
+    tmux set-environment -t "$SESSION_NAME" CONTAINER_NAME "$CONTAINER_NAME"
 }
 
 pane_cmd() {
