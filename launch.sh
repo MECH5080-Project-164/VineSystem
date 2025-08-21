@@ -244,7 +244,13 @@ EOF
 create_led_window() {
     if $DO_LEDS; then
         tmux new-window -t "$SESSION_NAME" -n leds
-        tmux split-window -h -t "$SESSION_NAME:leds" "$(run_in_container "echo [vine_led] starting; ros2 run led_control_vine led_control_vine_node || echo [vine_led] exited; echo '[vine_led] pane idle'; exec bash")"
+
+        tmux split-window -v -t "$SESSION_NAME:leds"
+        tmux split-window -h -t "$SESSION_NAME:leds.1"
+
+        tmux select-pane -t "$SESSION_NAME:leds.2"
+        pane_cmd "$SESSION_NAME:leds" "$(run_in_container "echo [vine_led] starting; ros2 run led_control_vine led_control_vine_node || echo [vine_led] exited; echo '[vine_led] pane idle'; exec bash")"
+        tmux select-pane -t "$SESSION_NAME:leds.3"
         pane_cmd "$SESSION_NAME:leds" "$(run_in_container "echo '[chassis_led] starting'; ros2 run led_control_chassis led_control_chassis_node || echo '[chassis_led] exited'; echo '[chassis_led] pane idle'; exec bash")"
     fi
 }
@@ -255,11 +261,11 @@ create_camera_window() {
 
         # Create a 2x2 layout
         tmux split-window -h -t "$SESSION_NAME:cameras"
-        tmux split-window -v -t "$SESSION_NAME:cameras.0"
         tmux split-window -v -t "$SESSION_NAME:cameras.1"
+        tmux split-window -v -t "$SESSION_NAME:cameras.2"
 
         # Top-left: Pi cam 0
-        tmux select-pane -t "$SESSION_NAME:cameras.0"
+        tmux select-pane -t "$SESSION_NAME:cameras.1"
         if $DO_PI_CAM; then
             CMD_PI0=$(cat <<'EOF'
 echo '[pi_cam0] starting camera index 0'
@@ -273,7 +279,7 @@ EOF
         fi
 
         # Top-right: Pi cam 1
-        tmux select-pane -t "$SESSION_NAME:cameras.2"
+        tmux select-pane -t "$SESSION_NAME:cameras.3"
         if $DO_PI_CAM; then
             CMD_PI1=$(cat <<'EOF'
 echo '[pi_cam1] starting camera index 1'
@@ -287,13 +293,13 @@ EOF
         fi
 
         # Bottom-left: viewer pane (split from top-left)
-        tmux select-pane -t "$SESSION_NAME:cameras.1"
+        tmux select-pane -t "$SESSION_NAME:cameras.2"
         pane_cmd "$SESSION_NAME:cameras" "$(run_in_container "echo '[viewer] rqt_image_view pane ready'; exec bash")"
         # Pre-type the command into the new active pane without executing
         tmux send-keys -t "$SESSION_NAME:cameras" "ros2 run rqt_image_view rqt_image_view"
 
         # Bottom-right: endoscope (split from top-right)
-        tmux select-pane -t "$SESSION_NAME:cameras.3"
+        tmux select-pane -t "$SESSION_NAME:cameras.4"
         if $DO_ENDOSCOPE; then
             CMD_ENDO=$(cat <<EOF
 echo '[endoscope] pre-config'
