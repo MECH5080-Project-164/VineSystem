@@ -153,18 +153,18 @@ pane_cmd() {
 create_micro_ros_window() {
     if $DO_MICRO_ROS; then
         tmux new-window -t "$SESSION_NAME" -n micro_ros
-        CMD=$(cat <<'EOF'
+        CMD=$(cat <<EOF
 FIND="$FIND_PICO_SCRIPT"
-if [[ -x $FIND ]]; then
-    DEV=$($FIND --first || true)
-    if [[ -n $DEV ]]; then
-        echo "[micro_ros] Starting on $DEV"
-        ros2 run micro_ros_agent micro_ros_agent serial --dev $DEV || echo "[micro_ros] agent exited"
+if [[ -x \$FIND ]]; then
+    DEV=\$(\$FIND --first || true)
+    if [[ -n \$DEV ]]; then
+        echo "[micro_ros] Starting on \$DEV"
+        ros2 run micro_ros_agent micro_ros_agent serial --dev \$DEV || echo "[micro_ros] agent exited"
     else
         echo "[micro_ros] Pico not found"
     fi
 else
-    echo "[micro_ros] Finder script missing at $FIND"
+    echo "[micro_ros] Finder script missing at \$FIND"
 fi
 echo "[micro_ros] pane idle"; exec bash
 EOF
