@@ -195,6 +195,9 @@ create_session() {
     tmux new-session -d -s "$SESSION_NAME" -n core "$core_cmd"
     tmux set-environment -t "$SESSION_NAME" SESSION_NAME "$SESSION_NAME"
     tmux set-environment -t "$SESSION_NAME" CONTAINER_NAME "$CONTAINER_NAME"
+
+    tmux split-window -h -t "$SESSION_NAME:core"
+    tmux send-keys -t "$SESSION_NAME:core.1" "$(run_in_container "bash -lc 'echo Hello from vine core; exec bash'")"
 }
 
 pane_cmd() {
@@ -206,6 +209,9 @@ pane_cmd() {
 create_micro_ros_window() {
     if $DO_MICRO_ROS; then
         tmux new-window -t "$SESSION_NAME" -n micro_ros
+        tmux split-window -h -t "$SESSION_NAME:micro_ros"
+
+        tmux select-pane -t "$SESSION_NAME:micro_ros.0"
         CMD=$(cat <<EOF
 FIND="$FIND_PICO_SCRIPT"
 if [[ -x \$FIND ]]; then
@@ -223,6 +229,9 @@ echo "[micro_ros] pane idle"; exec bash
 EOF
         )
         tmux send-keys -t "$SESSION_NAME:micro_ros" "$(run_in_container "$CMD")" C-m
+
+        tmux select-pane -t "$SESSION_NAME:micro_ros.1"
+        pane_cmd "$SESSION_NAME:micro_ros" "$(run_in_container "echo '[micro_ros] idle'; exec bash")"
     fi
 }
 
@@ -249,7 +258,7 @@ EOF
             )
             tmux split-window -h -t "$SESSION_NAME:pressure" "$(run_in_container "$CMD")"
         else
-            tmux split-window -h -t "$SESSION_NAME:pressure" "bash -lc 'echo Pressure control disabled; exec bash'"
+            tmux split-window -h -t "$SESSION_NAME:pressure" "$(run_in_container "bash -lc 'echo Pressure control disabled; exec bash'")"
         fi
     else
         tmux new-window -t "$SESSION_NAME" -n pressure "bash -lc 'echo Pressure sensing and control disabled; exec bash'"
@@ -261,12 +270,15 @@ create_led_window() {
         tmux new-window -t "$SESSION_NAME" -n leds
 
         tmux split-window -h -t "$SESSION_NAME:leds"
-        tmux split-window -v -t "$SESSION_NAME:leds.1"
+        tmux split-window -v -t "$SESSION_NAME:leds.0"
 
-        tmux select-pane -t "$SESSION_NAME:leds.1"
+        tmux select-pane -t "$SESSION_NAME:leds.0"
         pane_cmd "$SESSION_NAME:leds" "$(run_in_container "echo [vine_led] starting; ros2 run led_control_vine led_control_vine_node || echo [vine_led] exited; echo '[vine_led] pane idle'; exec bash")"
-        tmux select-pane -t "$SESSION_NAME:leds.2"
+        tmux select-pane -t "$SESSION_NAME:leds.1"
         pane_cmd "$SESSION_NAME:leds" "$(run_in_container "echo '[chassis_led] starting'; ros2 run led_control_chassis led_control_chassis_node || echo '[chassis_led] exited'; echo '[chassis_led] pane idle'; exec bash")"
+
+        tmux select-pane -t "$SESSION_NAME:leds.2"
+        pane_cmd "$SESSION_NAME:leds" "$(run_in_container "echo '[vine_led] idle'; exec bash")"
     fi
 }
 
@@ -276,11 +288,11 @@ create_camera_window() {
 
         # Create a 2x2 layout
         tmux split-window -h -t "$SESSION_NAME:cameras"
+        tmux split-window -v -t "$SESSION_NAME:cameras.0"
         tmux split-window -v -t "$SESSION_NAME:cameras.1"
-        tmux split-window -v -t "$SESSION_NAME:cameras.2"
 
         # Top-left: Pi cam 0
-        tmux select-pane -t "$SESSION_NAME:cameras.1"
+        tmux select-pane -t "$SESSION_NAME:cameras.0"
         if $DO_PI_CAM; then
             CMD_PI0=$(cat <<'EOF'
 echo '[pi_cam0] starting camera index 0'
@@ -294,7 +306,7 @@ EOF
         fi
 
         # Top-right: Pi cam 1
-        tmux select-pane -t "$SESSION_NAME:cameras.3"
+        tmux select-pane -t "$SESSION_NAME:cameras.1"
         if $DO_PI_CAM; then
             CMD_PI1=$(cat <<'EOF'
 echo '[pi_cam1] starting camera index 1'
@@ -314,7 +326,7 @@ EOF
         tmux send-keys -t "$SESSION_NAME:cameras" "ros2 run rqt_image_view rqt_image_view"
 
         # Bottom-right: endoscope (split from top-right)
-        tmux select-pane -t "$SESSION_NAME:cameras.4"
+        tmux select-pane -t "$SESSION_NAME:cameras.3"
         if $DO_ENDOSCOPE; then
             CMD_ENDO=$(cat <<EOF
 echo '[endoscope] pre-config'
