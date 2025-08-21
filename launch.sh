@@ -49,7 +49,38 @@ error() { echo "[vine_tmux] ERROR: $*" >&2; }
 info()  { echo "[vine_tmux] $*" >&2; }
 
 usage() {
-  sed -n '1,/^$/p' "$0" | sed 's/^# \{0,1\}//'
+  cat <<EOF
+Usage: $0 [options]
+
+Launches an interactive session for controlling the Vine System in a tmux session.
+
+General Options:
+  -h, --help              Show this help message and exit.
+  -s, --session NAME      Set the tmux session name (default: $SESSION_NAME).
+  -a, --attach            Automatically attach to the tmux session (default).
+  -d, --detach            Do not attach to the session after creation.
+  --force-recreate        Kill any existing tmux session with the same name before starting.
+
+Container Options:
+  --container NAME        Specify the target container name (default: $CONTAINER_NAME).
+  --start-container       Attempt to start the container using 'docker compose up -d'.
+
+Component Toggles:
+  --no-overlay-source     Do not source the workspace overlay setup file.
+  --no-micro-ros          Disable the micro-ROS agent window.
+  --no-pressure-sensor    Disable the pressure sensor pane.
+  --pressure-control      Enable the pressure control pane (disabled by default).
+  --no-leds               Disable the LEDs window.
+  --no-cameras            Disable the cameras window entirely.
+  --no-endoscope          Disable only the endoscope pane within the cameras window.
+  --no-pi-cam             Disable only the Pi camera panes within the cameras window.
+
+Endoscope Configuration:
+  --endo-params FILE      Path to the endoscope parameters file inside the container.
+  --no-auto-config-endo   Disable automatic endoscope configuration script.
+  -y, --yes               Assume 'yes' for any interactive prompts (e.g., endoscope config).
+
+EOF
   exit 0
 }
 
@@ -252,7 +283,7 @@ EOF
             )
             pane_cmd "$SESSION_NAME:cameras" "$(run_in_container "$CMD_PI1")"
         else
-            pane_cmd "$SESSION_NAME:cameras." "bash -lc 'echo Pi cam 1 disabled'; exec bash'"
+            pane_cmd "$SESSION_NAME:cameras" "bash -lc 'echo Pi cam 1 disabled'; exec bash'"
         fi
 
         # Bottom-left: viewer pane (split from top-left)
@@ -281,9 +312,9 @@ ros2 run usb_cam usb_cam_node_exe --ros-args --params-file "$ENDO_PARAMS" || ech
 echo '[endoscope] pane idle'; exec bash
 EOF
             )
-            pane_cmd "$SESSION_NAME:cameras.1" "$(run_in_container "$CMD_ENDO")"
+            pane_cmd "$SESSION_NAME:cameras" "$(run_in_container "$CMD_ENDO")"
         else
-            pane_cmd "$SESSION_NAME:cameras.1" "bash -lc 'echo Endoscope disabled; exec bash'"
+            pane_cmd "$SESSION_NAME:cameras" "bash -lc 'echo Endoscope disabled; exec bash'"
         fi
 
         # Select a default layout to balance the panes
