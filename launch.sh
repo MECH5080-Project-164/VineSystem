@@ -222,7 +222,13 @@ create_camera_window() {
     if $DO_CAMERAS; then
         tmux new-window -t "$SESSION_NAME" -n cameras
 
+        # Create a 2x2 layout
+        tmux split-window -h -t "$SESSION_NAME:cameras"
+        tmux split-window -v -t "$SESSION_NAME:cameras.0"
+        tmux split-window -v -t "$SESSION_NAME:cameras.1"
+
         # Top-left: Pi cam 0
+        tmux select-pane -t "$SESSION_NAME:cameras.0"
         if $DO_PI_CAM; then
             CMD_PI0=$(cat <<'EOF'
 echo '[pi_cam0] starting camera index 0'
@@ -236,6 +242,7 @@ EOF
         fi
 
         # Top-right: Pi cam 1
+        tmux select-pane -t "$SESSION_NAME:cameras.2"
         if $DO_PI_CAM; then
             CMD_PI1=$(cat <<'EOF'
 echo '[pi_cam1] starting camera index 1'
@@ -243,17 +250,19 @@ ros2 run camera_ros camera_node --ros-args -p camera:=1 || echo '[pi_cam1] exite
 echo '[pi_cam1] pane idle'; exec bash
 EOF
             )
-            tmux split-window -h -t "$SESSION_NAME:cameras.0" "$(run_in_container "$CMD_PI1")"
+            pane_cmd "$SESSION_NAME:cameras" "$(run_in_container "$CMD_PI1")"
         else
-            tmux split-window -h -t "$SESSION_NAME:cameras.0" "bash -lc 'echo Pi cam 1 disabled'; exec bash'"
+            pane_cmd "$SESSION_NAME:cameras." "bash -lc 'echo Pi cam 1 disabled'; exec bash'"
         fi
 
         # Bottom-left: viewer pane (split from top-left)
-        tmux split-window -v -t "$SESSION_NAME:cameras.0" "$(run_in_container "echo '[viewer] rqt_image_view pane ready'; exec bash")"
+        tmux select-pane -t "$SESSION_NAME:cameras.1"
+        pane_cmd "$SESSION_NAME:cameras" "$(run_in_container "echo '[viewer] rqt_image_view pane ready'; exec bash")"
         # Pre-type the command into the new active pane without executing
         tmux send-keys -t "$SESSION_NAME:cameras" "ros2 run rqt_image_view rqt_image_view"
 
         # Bottom-right: endoscope (split from top-right)
+        tmux select-pane -t "$SESSION_NAME:cameras.3"
         if $DO_ENDOSCOPE; then
             CMD_ENDO=$(cat <<EOF
 echo '[endoscope] pre-config'
@@ -272,9 +281,9 @@ ros2 run usb_cam usb_cam_node_exe --ros-args --params-file "$ENDO_PARAMS" || ech
 echo '[endoscope] pane idle'; exec bash
 EOF
             )
-            tmux split-window -v -t "$SESSION_NAME:cameras.1" "$(run_in_container "$CMD_ENDO")"
+            pane_cmd "$SESSION_NAME:cameras.1" "$(run_in_container "$CMD_ENDO")"
         else
-            tmux split-window -v -t "$SESSION_NAME:cameras.1" "bash -lc 'echo Endoscope disabled; exec bash'"
+            pane_cmd "$SESSION_NAME:cameras.1" "bash -lc 'echo Endoscope disabled; exec bash'"
         fi
 
         # Select a default layout to balance the panes
