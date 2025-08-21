@@ -36,14 +36,14 @@ START_CONTAINER=false
 CONTAINER_WORKSPACE="/home/workspace"
 
 # Workspace overlay (built packages) setup script relative to workspace root
-OVERLAY_SETUP_REL="/home/workspace/students/VineSystem/vine_ws/install/setup.bash"
+OVERLAY_SETUP_REL="$CONTAINER_WORKSPACE/students/VineSystem/vine_ws/install/setup.bash"
 SOURCE_OVERLAY=true
 
 # Derived paths inside container (avoid stale hard-coded host paths)
 FIND_ENDO_SCRIPT="$CONTAINER_WORKSPACE/students/VineSystem/scripts/tooling/find_endoscope.sh"
 FIND_PICO_SCRIPT="$CONTAINER_WORKSPACE/students/VineSystem/scripts/tooling/find_pico.sh"
 # Path to Endoscope Camera parameters file
-ENDO_PARAMS="$CONTAINER_WORKSPACE/students/VineSystem/vine_ws/src/vine_launch/resources/endo_cam_params.yaml"
+ENDO_PARAMS="$CONTAINER_WORKSPACE/students/VineSystem/resources/endo_cam_params.yaml"
 
 error() { echo "[vine_tmux] ERROR: $*" >&2; }
 info()  { echo "[vine_tmux] $*" >&2; }
@@ -245,12 +245,12 @@ create_led_window() {
     if $DO_LEDS; then
         tmux new-window -t "$SESSION_NAME" -n leds
 
-        tmux split-window -v -t "$SESSION_NAME:leds"
-        tmux split-window -h -t "$SESSION_NAME:leds.1"
+        tmux split-window -h -t "$SESSION_NAME:leds"
+        tmux split-window -v -t "$SESSION_NAME:leds.1"
 
-        tmux select-pane -t "$SESSION_NAME:leds.2"
+        tmux select-pane -t "$SESSION_NAME:leds.1"
         pane_cmd "$SESSION_NAME:leds" "$(run_in_container "echo [vine_led] starting; ros2 run led_control_vine led_control_vine_node || echo [vine_led] exited; echo '[vine_led] pane idle'; exec bash")"
-        tmux select-pane -t "$SESSION_NAME:leds.3"
+        tmux select-pane -t "$SESSION_NAME:leds.2"
         pane_cmd "$SESSION_NAME:leds" "$(run_in_container "echo '[chassis_led] starting'; ros2 run led_control_chassis led_control_chassis_node || echo '[chassis_led] exited'; echo '[chassis_led] pane idle'; exec bash")"
     fi
 }
