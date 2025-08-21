@@ -1,3 +1,4 @@
+name: vine
 services:
   vine_system:
     image: ${IMAGE_NAME:-vine_system:latest}
@@ -5,6 +6,9 @@ services:
     privileged: true
     network_mode: "host"
     hostname: vine-docker
+    labels:
+      - com.vinesystem.role=runtime
+      - com.vinesystem.name=vine-docker
     extra_hosts:
       - "vine-docker:127.0.1.1"
 

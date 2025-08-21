@@ -101,10 +101,24 @@ if $START_CONTAINER; then
     fi
 fi
 
-# Check if the container is running
-if ! docker ps --format '{{.Names}}' | grep -qx "$CONTAINER_NAME"; then
-  error "Container $CONTAINER_NAME not running. Use --start-container or start manually."; exit 1
+# Resolve actual container name (allow for compose project prefixes)
+resolve_container_name() {
+    local exact
+    if exact=$(docker ps --format '{{.Names}}' | grep -Fx "$CONTAINER_NAME" || true); then
+        if [[ -n "$exact" ]]; then echo "$exact"; return 0; fi
+    fi
+    # Try prefix/suffix patterns (compose may prepend project hash or directory)
+    local match
+    match=$(docker ps --format '{{.Names}}' | grep -E "(^|_)${CONTAINER_NAME}$" | head -n1 || true)
+    if [[ -n "$match" ]]; then echo "$match"; return 0; fi
+    return 1
+}
+
+ACTUAL_CONTAINER_NAME=$(resolve_container_name) || { error "Container matching '$CONTAINER_NAME' not running. Use --start-container or specify --container <name>."; exit 1; }
+if [[ "$ACTUAL_CONTAINER_NAME" != "$CONTAINER_NAME" ]]; then
+    info "Resolved container name: $ACTUAL_CONTAINER_NAME (from requested $CONTAINER_NAME)"
 fi
+CONTAINER_NAME="$ACTUAL_CONTAINER_NAME"
 
 # Kill existing session if requested
 if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
