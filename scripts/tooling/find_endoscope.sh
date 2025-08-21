@@ -5,7 +5,7 @@ set -e
 # --- Configuration ---
 CAMERA_NAME_PATTERN="USB Camera:.*Medical"
 DEFAULT_MOUNT_POINT="/dev/generic_video_mount"
-PARAMETER_FILE="$MOUNT_POINT/students/acuity_code/pharos_ws/src/pharos_ros/config/params_1.yaml"
+PARAMETER_FILE="$MOUNT_POINT/students/workspace/VineSystem/resources/endo_cam_params.yaml"
 
 # --- Functions ---
 error() {

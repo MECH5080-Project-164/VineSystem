@@ -10,7 +10,7 @@ if [ -z "${VINE_CONTAINER:-}" ]; then
   exit 1
 fi
 
-PARAM_FILE="/home/workspace/students/acuity_code/pharos_ws/src/pharos_ros/config/params_1.yaml"
+PARAM_FILE="/home/workspace/students/VineSystem/resources/endo_cam_params.yaml"
 
 usage() {
   cat <<EOF
