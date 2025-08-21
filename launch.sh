@@ -16,11 +16,6 @@ SESSION_NAME=vine
 ATTACH_AUTO=true
 FORCE_RECREATE=false
 
-# Path to Endoscope Camera parameters file
-ENDO_PARAMS="./vine_ws/src/vine_launch/resources/endo_cam_params.yaml"
-# Path to the Pico finder script (make configurable for maintainability)
-FIND_PICO_SCRIPT="/home/workspace/students/VineSystem/scripts/tooling/find_pico.sh"
-
 # Which nodes/components to start (defaults)
 DO_MICRO_ROS=true
 DO_PRESSURE_SENSOR=true
@@ -40,9 +35,15 @@ START_CONTAINER=false
 # Container workspace root (mount point in docker-compose)
 CONTAINER_WORKSPACE="/home/workspace"
 
+# Workspace overlay (built packages) setup script relative to workspace root
+OVERLAY_SETUP_REL="/home/workspace/students/VineSystem/vine_ws/install/setup.bash"
+SOURCE_OVERLAY=true
+
 # Derived paths inside container (avoid stale hard-coded host paths)
-FIND_ENDO_SCRIPT="$CONTAINER_WORKSPACE/scripts/tooling/find_endoscope.sh"
-FIND_PICO_SCRIPT="$CONTAINER_WORKSPACE/scripts/tooling/find_pico.sh"
+FIND_ENDO_SCRIPT="$CONTAINER_WORKSPACE/students/VineSystem/scripts/tooling/find_endoscope.sh"
+FIND_PICO_SCRIPT="$CONTAINER_WORKSPACE/students/VineSystem/scripts/tooling/find_pico.sh"
+# Path to Endoscope Camera parameters file
+ENDO_PARAMS="$CONTAINER_WORKSPACE/students/VineSystem/vine_ws/src/vine_launch/resources/endo_cam_params.yaml"
 
 error() { echo "[vine_tmux] ERROR: $*" >&2; }
 info()  { echo "[vine_tmux] $*" >&2; }
@@ -64,6 +65,7 @@ parse_args() {
             --force-recreate) FORCE_RECREATE=true; shift;;
             --container) CONTAINER_NAME="$2"; shift 2;;
             --start-container) START_CONTAINER=true; shift;;
+            --no-overlay-source) SOURCE_OVERLAY=false; shift;;
             --no-micro-ros) DO_MICRO_ROS=false; shift;;
             --no-pressure-sensor) DO_PRESSURE_SENSOR=false; shift;;
             --pressure-control) DO_PRESSURE_CONTROL=true; shift;;
@@ -92,6 +94,7 @@ info "Component selection:" \
     " leds=$DO_LEDS" \
     " cameras=$DO_CAMERAS(pi=$DO_PI_CAM, endoscope=$DO_ENDOSCOPE)" \
     " endo_autoconfig=$AUTO_CONFIG_ENDO"
+info "Overlay sourcing: $SOURCE_OVERLAY (file: $OVERLAY_SETUP_REL)"
 if $START_CONTAINER; then
     if command -v docker >/dev/null; then
         info "Starting container via docker compose ..."
@@ -132,7 +135,11 @@ if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
 fi
 
 # Command wrapper
-ENV_PREFIX='source /ros_env_setup.sh 2>/dev/null || true; '
+if $SOURCE_OVERLAY; then
+    ENV_PREFIX='source /ros_env_setup.sh 2>/dev/null || true; if [ -f '"$OVERLAY_SETUP_REL"' ]; then source '"$OVERLAY_SETUP_REL"'; else echo "[overlay] missing $OVERLAY_SETUP_REL" >&2; fi; '
+else
+    ENV_PREFIX='source /ros_env_setup.sh 2>/dev/null || true; '
+fi
 run_in_container() {
     local cmd="$1"
     # Always cd into workspace so relative paths (like ENDO_PARAMS) are valid
