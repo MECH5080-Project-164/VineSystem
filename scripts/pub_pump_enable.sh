@@ -4,11 +4,11 @@ IFS=$'\n\t'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Try to source workspace if present (convenience)
-if [[ -f "$SCRIPT_DIR/../vine_ws/install/setup.bash" ]]; then
-  # shellcheck disable=SC1090
-  source "$SCRIPT_DIR/../vine_ws/install/setup.bash"
-fi
+# # Try to source workspace if present (convenience)
+# if [[ -f "$SCRIPT_DIR/../vine_ws/install/setup.bash" ]]; then
+#   # shellcheck disable=SC1090
+#   source "$SCRIPT_DIR/../vine_ws/install/setup.bash"
+# fi
 
 usage() {
   cat <<EOF
