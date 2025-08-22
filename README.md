@@ -68,7 +68,7 @@ We prefer to communicate over the primary UART which defaults to GPIO 14 (TX) an
 
 ### U2D2 udev Rule
 
-Testing revealed that the U2D2 would often change its device path even while it was being used. To mitigate this, a udev rule was implemented to symlink the U2D2 device to a consistent path.
+Testing revealed that the U2D2 would often change its device path even while it was being used. To mitigate this, a udev rule was implemented to symlink the U2D2 device to a consistent path. See `/etc/udev/rules.d/98-dynamixel.rules`.
 
 ## Docker
 
