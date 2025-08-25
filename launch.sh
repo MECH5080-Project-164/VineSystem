@@ -19,7 +19,7 @@ FORCE_RECREATE=false
 # Which nodes/components to start (defaults)
 DO_MICRO_ROS=true
 DO_PRESSURE_SENSOR=true
-DO_PRESSURE_CONTROL=false
+DO_PRESSURE_CONTROL=true
 DO_LEDS=true
 DO_CAMERAS=true
 DO_ENDOSCOPE=true     # subset of cameras; allows disabling just endoscope
@@ -74,7 +74,7 @@ Component Toggles:
   --no-overlay-source     Do not source the workspace overlay setup file.
   --no-micro-ros          Disable the micro-ROS agent window.
   --no-pressure-sensor    Disable the pressure sensor pane.
-  --pressure-control      Enable the pressure control pane (disabled by default).
+  --no-pressure-control   Disable the pressure control pane.
   --no-leds               Disable the LEDs window.
   --no-cameras            Disable the cameras window entirely.
   --no-endoscope          Disable only the endoscope pane within the cameras window.
@@ -104,7 +104,6 @@ parse_args() {
             --no-overlay-source) SOURCE_OVERLAY=false; shift;;
             --no-micro-ros) DO_MICRO_ROS=false; shift;;
             --no-pressure-sensor) DO_PRESSURE_SENSOR=false; shift;;
-            --pressure-control) DO_PRESSURE_CONTROL=true; shift;;
             --no-pressure-control) DO_PRESSURE_CONTROL=false; shift;;
             --no-leds) DO_LEDS=false; shift;;
             --no-cameras) DO_CAMERAS=false; shift;;
@@ -355,6 +354,44 @@ EOF
     fi
 }
 
+# Monitoring window: temperature monitor, battery voltage (pre-typed), spare pane
+create_monitor_window() {
+        # Always create (no toggle yet)
+        tmux new-window -t "$SESSION_NAME" -n monitor
+
+        # Create right column, then split it for two panes (battery + spare)
+        tmux split-window -h -t "$SESSION_NAME:monitor"
+        tmux split-window -v -t "$SESSION_NAME:monitor.1"
+
+        # Pane 0: Run temperature monitoring script inside container
+        tmux select-pane -t "$SESSION_NAME:monitor.0"
+        TEMP_SCRIPT_PATH="$CONTAINER_WORKSPACE/students/VineSystem/scripts/monitor_temperatures.sh"
+            CMD_TEMP=$(cat <<EOF
+if [ -x "$TEMP_SCRIPT_PATH" ]; then
+    echo '[monitor] starting temperature monitor'
+    bash "$TEMP_SCRIPT_PATH" || echo '[monitor] temperature monitor exited'
+else
+    echo "[monitor] temperature script not executable: $TEMP_SCRIPT_PATH"
+fi
+echo '[monitor] temperature pane idle'; exec bash
+EOF
+        )
+        pane_cmd "$SESSION_NAME:monitor" "$(run_in_container "$CMD_TEMP")"
+
+        # Pane 1: Battery voltage echo command prepared but not executed
+        tmux select-pane -t "$SESSION_NAME:monitor.1"
+        pane_cmd "$SESSION_NAME:monitor" "$(run_in_container "echo '[battery] pane ready'; exec bash")"
+        # Pre-type without executing (no Enter)
+        tmux send-keys -t "$SESSION_NAME:monitor.1" "ros2 topic echo /battery_voltage"
+
+        # Pane 2: Spare container pane idle
+        tmux select-pane -t "$SESSION_NAME:monitor.2"
+        pane_cmd "$SESSION_NAME:monitor" "$(run_in_container "echo '[monitor] spare pane'; exec bash")"
+
+        # Optional: set a tiled layout for clarity
+        tmux select-layout -t "$SESSION_NAME:monitor" tiled
+}
+
 # Create initial tmux session and panes
 create_session
 
@@ -372,6 +409,9 @@ create_led_window
 
 # Window 4 (Cameras)
 create_camera_window
+
+# Window 5 (Monitoring: temperatures, battery, spare)
+create_monitor_window
 
 # Switch to core window
 tmux select-window -t "$SESSION_NAME:core"
