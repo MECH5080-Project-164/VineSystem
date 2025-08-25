@@ -104,24 +104,22 @@ ros2 param set /pressure_control_node debug_force_pwm -1   # Disable debug mode
 
 ### Pump enable / disable
 
-The pressure controller exposes a global enable flag and a runtime topic for pump control:
+The pressure controller exposes a single parameter for pump control:
 
 -- Parameter: `pump_enabled` (bool) — default: `false`.
--- Topic: `/pump/enable` (`std_msgs/msg/Bool`) — publishing `true` or `false` immediately enables/disables the pump control.
 
-When disabled, the controller will stop publishing PWM and will reset internal integrator/derivative state. Use either the parameter (persistent until changed) or the topic (immediate runtime control).
+The former `/pump/enable` topic has been removed; enable/disable is now done only via the parameter. When `pump_enabled` is set to `false` the controller:
+-- Publishes a single 0 PWM message
+-- Resets integral and derivative state
+-- Skips PID computation while disabled
 
 Examples:
 
 ```bash
-# Disable pump immediately
-ros2 topic pub -1 /pump/enable std_msgs/msg/Bool "{data: false}"
+# Disable pump (runtime + persistent)
+ros2 param set /pressure_control_node pump_enabled false
 
 # Re-enable pump
-ros2 topic pub -1 /pump/enable std_msgs/msg/Bool "{data: true}"
-
-# Or set the parameter persistently
-ros2 param set /pressure_control_node pump_enabled false
 ros2 param set /pressure_control_node pump_enabled true
 ```
 

@@ -1,124 +1,106 @@
 #!/usr/bin/env bash
+# Simple helper to enable/disable the pressure control pump by setting the ROS 2 parameter
+# The /pump/enable topic has been removed; this now only manipulates the parameter
+#
+# Usage:
+#   pub_pump_enable.sh on        # set pump_enabled true
+#   pub_pump_enable.sh off       # set pump_enabled false
+#   pub_pump_enable.sh toggle    # invert current value
+#   pub_pump_enable.sh status    # show current value
+#   pub_pump_enable.sh help      # show help
+#
+# Notes:
+# - Assumes the environment already has ROS 2 sourced (e.g., via your container entrypoint)
+# - Fails gracefully if node or parameter not available yet
+
 set -euo pipefail
-IFS=$'\n\t'
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+NODE="/pressure_control_node"
+PARAM="pump_enabled"
 
-# # Try to source workspace if present (convenience)
-# if [[ -f "$SCRIPT_DIR/../vine_ws/install/setup.bash" ]]; then
-#   # shellcheck disable=SC1090
-#   source "$SCRIPT_DIR/../vine_ws/install/setup.bash"
-# fi
+color() { # $1=color $2=message
+  local c="$1"; shift
+  local msg="$*"
+  local code
+  case "$c" in
+    red) code='\033[31m';;
+    green) code='\033[32m';;
+    yellow) code='\033[33m';;
+    blue) code='\033[34m';;
+    *) code='';;
+  esac
+  printf "%b%s\033[0m\n" "$code" "$msg"
+}
+
+get_current() {
+  # Output: true/false/unknown
+  local out
+  if ! out=$(ros2 param get "$NODE" "$PARAM" 2>/dev/null); then
+    echo unknown
+    return 1
+  fi
+  if grep -qi 'True' <<<"$out"; then echo true; return 0; fi
+  if grep -qi 'False' <<<"$out"; then echo false; return 0; fi
+  echo unknown; return 1
+}
+
+set_param() { # $1=true|false
+  local val="$1"
+  if ros2 param set "$NODE" "$PARAM" "$val" >/dev/null 2>&1; then
+    color green "Set $PARAM -> $val"
+  else
+    color red "Failed to set $PARAM (is the node running?)"
+    exit 1
+  fi
+}
+
+print_status() {
+  local cur
+  cur=$(get_current || true)
+  if [[ $cur == unknown ]]; then
+    color yellow "Status: unknown (node or parameter not available)"
+  else
+    if [[ $cur == true ]]; then
+      color green "Status: $PARAM = true"
+    else
+      color red "Status: $PARAM = false"
+    fi
+  fi
+}
 
 usage() {
   cat <<EOF
-Usage: ${0##*/} <on|off|toggle|status> [--persist]
+Usage: $0 <on|off|toggle|status|help>
 
-Commands:
-  on        Publish /pump/enable true
-  off       Publish /pump/enable false
-  toggle    Toggle current state (reads parameter or topic)
-  status    Show pump_enabled parameter and last /pump/enable message (if available)
-
-Options:
-  --persist   Also set the persistent parameter /pressure_control_node pump_enabled
-
-Examples:
-  ${0##*/} on
-  ${0##*/} toggle --persist
-  ${0##*/} status
+Controls the '$PARAM' parameter on node '$NODE'.
 EOF
 }
 
-if [[ ${#@} -lt 1 ]]; then
-  usage
-  exit 2
-fi
-
-CMD="${1:-}"; shift || true
-PERSIST=0
-while [[ ${#@} -gt 0 ]]; do
-  case "$1" in
-    --persist) PERSIST=1; shift;;
-    -h|--help) usage; exit 0;;
-    *) echo "Unknown option: $1" >&2; usage; exit 2;;
-  esac
-done
-
-publish() {
-  local val=$1
-  echo "Publishing /pump/enable -> $val"
-  ros2 topic pub -1 /pump/enable std_msgs/msg/Bool "{data: $val}"
-  if [[ $PERSIST -eq 1 ]]; then
-    echo "Setting persistent parameter /pressure_control_node pump_enabled -> $val"
-    ros2 param set /pressure_control_node pump_enabled "$val" || true
-  fi
-}
-
-read_current() {
-  # Prefer parameter (fast). If missing, attempt to read one message from topic with timeout.
-  local param_val
-  if param_val=$(ros2 param get /pressure_control_node pump_enabled 2>/dev/null || true); then
-    if [[ -n "$param_val" ]]; then
-      # param output looks like: 'pump_enabled: True'
-      if echo "$param_val" | grep -iq "true"; then
-        echo true
-        return
-      elif echo "$param_val" | grep -iq "false"; then
-        echo false
-        return
-      fi
-    fi
-  fi
-
-  # fallback: try reading last published message (non-blocking with timeout)
-  if command -v timeout >/dev/null 2>&1; then
-    out=$(timeout 2 ros2 topic echo -n1 /pump/enable 2>/dev/null || true)
-  else
-    out=$(ros2 topic echo -n1 /pump/enable 2>/dev/null || true)
-  fi
-  if echo "$out" | grep -iq "data:\s*true"; then
-    echo true
-  elif echo "$out" | grep -iq "data:\s*false"; then
-    echo false
-  else
-    echo unknown
-  fi
-}
-
-case "$CMD" in
+cmd="${1:-status}"
+case "$cmd" in
   on)
-    publish true
+    set_param true
     ;;
   off)
-    publish false
+    set_param false
     ;;
   toggle)
-    cur=$(read_current)
-    if [[ "$cur" == "true" ]]; then
-      publish false
-    elif [[ "$cur" == "false" ]]; then
-      publish true
-    else
-      echo "Current state unknown; defaulting to enabling pump" >&2
-      publish true
-    fi
+    cur=$(get_current || true)
+    case "$cur" in
+      true) set_param false ;;
+      false) set_param true ;;
+      *) color red "Cannot toggle: current value unknown"; exit 1 ;;
+    esac
     ;;
   status)
-    echo "Persistent parameter (/pressure_control_node pump_enabled):"
-    ros2 param get /pressure_control_node pump_enabled || echo "(not set or not available)"
-    echo "Last /pump/enable topic message (attempt):"
-    if command -v timeout >/dev/null 2>&1; then
-      timeout 2 ros2 topic echo -n1 /pump/enable || true
-    else
-      ros2 topic echo -n1 /pump/enable || true
-    fi
+    print_status
+    ;;
+  help|-h|--help)
+    usage
     ;;
   *)
-    echo "Unknown command: $CMD" >&2
+    color red "Unknown command: $cmd"
     usage
-    exit 2
+    exit 1
     ;;
-esac
-
-exit 0
+ esac
